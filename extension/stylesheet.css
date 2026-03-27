@@ -1,0 +1,17 @@
+/* Janeway Dictate Extension Styles */
+
+/* Recording indicator - rotes Icon während Aufnahme */
+.system-status-icon.recording {
+    color: #e01b24;
+}
+
+/* Processing indicator - orange pulsierendes Icon während Verarbeitung */
+.system-status-icon.processing {
+    color: #e5a50a;
+    transition-duration: 800ms;
+}
+
+/* Panel Button */
+#paneljaneway-dictate {
+    -natural-hpadding: 6px;
+}

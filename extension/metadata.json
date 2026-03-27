@@ -1,0 +1,8 @@
+{
+  "name": "Janeway Dictate",
+  "description": "Speech-to-Text für GNOME - Linksklick startet/stoppt Aufnahme, Rechtsklick öffnet Einstellungen",
+  "uuid": "janeway-dictate@janeway.technology",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "version": 1,
+  "url": "https://github.com/janeway-technology/janeway-dictate"
+}

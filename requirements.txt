@@ -1,0 +1,12 @@
+# Janeway Dictate - Python Dependencies
+# Install with: pip install -r requirements.txt
+#
+# PyGObject und dbus-python kommen als System-Pakete
+# (python-gobject, python-dbus) und sind über --system-site-packages verfügbar.
+
+# Speech-to-Text Engine
+faster-whisper>=0.10.0
+
+# Audio Recording
+sounddevice>=0.4.6
+numpy>=1.24.0
