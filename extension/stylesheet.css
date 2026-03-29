@@ -1,4 +1,4 @@
-/* Janeway Dictate Extension Styles */
+/* JT Dictate Extension Styles */
 
 /* Recording indicator - rotes Icon während Aufnahme */
 .system-status-icon.recording {
@@ -12,6 +12,6 @@
 }
 
 /* Panel Button */
-#paneljaneway-dictate {
+#paneljt-dictate {
     -natural-hpadding: 6px;
 }

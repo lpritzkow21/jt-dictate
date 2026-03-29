@@ -1,6 +1,28 @@
-# Changelog - Janeway Dictate
+# Changelog - JT Dictate
 
-## [0.1.0-beta] - 2026-03-25 (geplant)
+## [0.2.0] - 2026-03-28
+
+Großes UI/UX-Update mit Recording Pill, Visualisierungen, Theme-System und Preferences Panel.
+
+### Neue Features
+- **Recording Pill**: Floating Overlay-Widget während der Aufnahme
+- **5 Visualisierungstypen**: Bars, Waveform, Pulse, Circle, Equalizer
+- **Preferences Panel**: Vollständige GNOME-Einstellungsseite (Adw/GTK4)
+- **Theme-System**: 5 Built-in Themes (Default, Neon, Minimal, Ocean, Sunset)
+- **Dark/Light Mode**: Automatische Erkennung des GNOME System-Themes
+- **Custom Themes**: Eigene Themes erstellen, exportieren und importieren
+- **Settings Export/Import**: Alle Einstellungen als JSON exportieren/importieren
+- **Custom Icon**: Eigenes SVG/PNG als Mikrofon-Icon laden
+- **Konfigurierbar**: Pill-Größe, Position, Border, Blur, Shadow, Gradient, Farben
+
+### Verbesserungen
+- Menüpunkt "Alle Einstellungen..." öffnet das Preferences Panel
+- Pill wird automatisch bei Aufnahme angezeigt und bei Stopp versteckt
+- Visualisierung mit Smoothing für flüssige Animationen
+
+---
+
+## [0.1.0-beta] - 2026-03-25
 
 Erster Beta-Release nach intensiver Entwicklung und Debugging.
 
@@ -13,12 +35,12 @@ Erster Beta-Release nach intensiver Entwicklung und Debugging.
 - 3-State Icon-Feedback: idle (Mikrofon) → recording (rot) → processing (orange)
 - Automatische Zwischenablage-Kopie
 - D-Bus Service für CLI-Steuerung (`--toggle`, `--start`, `--stop`, `--status`)
-- Persistente Einstellungen (~/.config/janeway-dictate/settings.json)
+- Persistente Einstellungen (~/.config/jt-dictate/settings.json)
 
 ### Architektur
 - Headless Python Backend mit GLib MainLoop
 - GNOME Shell Extension für UI (kein eigenes App-Fenster)
-- Kommunikation über D-Bus (de.janeway.Dictate)
+- Kommunikation über D-Bus (de.jt.Dictate)
 - Alle D-Bus Calls vollständig async (kein Desktop-Freeze)
 
 ---

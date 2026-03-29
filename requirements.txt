@@ -1,4 +1,4 @@
-# Janeway Dictate - Python Dependencies
+# JT Dictate - Python Dependencies
 # Install with: pip install -r requirements.txt
 #
 # PyGObject und dbus-python kommen als System-Pakete

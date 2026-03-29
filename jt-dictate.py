@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Janeway Dictate - Push-to-Talk Speech-to-Text für GNOME/Linux
+JT Dictate - Push-to-Talk Speech-to-Text für GNOME/Linux
 Headless Backend mit D-Bus Service.
 Die UI (Icon, Menü) wird von der GNOME Shell Extension bereitgestellt.
 
-Copyright (c) Janeway Technology
+Copyright (c) JT Tools
 """
 
 import sys
@@ -32,11 +32,11 @@ import numpy as np
 sounddevice = None
 
 # Konstanten
-APP_NAME = "Janeway Dictate"
-APP_ID = "janeway-dictate"
-DBUS_SERVICE = "de.janeway.Dictate"
-DBUS_PATH = "/de/janeway/Dictate"
-CONFIG_DIR = os.path.expanduser("~/.config/janeway-dictate")
+APP_NAME = "JT Dictate"
+APP_ID = "jt-dictate"
+DBUS_SERVICE = "de.jt.Dictate"
+DBUS_PATH = "/de/jt/Dictate"
+CONFIG_DIR = os.path.expanduser("~/.config/jt-dictate")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 # Standard-Einstellungen
@@ -44,6 +44,10 @@ DEFAULT_SETTINGS = {
     "auto_clipboard": True,
     "model": "base",
     "language": None,
+    "sound_enabled": True,
+    "sound_volume": 0.5,
+    "sound_start": "default",
+    "sound_stop": "default",
 }
 
 
@@ -81,7 +85,7 @@ class Settings:
         self.save()
 
 
-class JanewayDictateDBus(dbus.service.Object):
+class JtDictateDBus(dbus.service.Object):
     """D-Bus Interface für Kommunikation mit der GNOME Shell Extension."""
 
     def __init__(self, app, bus, path):
@@ -102,32 +106,74 @@ class JanewayDictateDBus(dbus.service.Object):
 
     @dbus.service.method(DBUS_SERVICE, in_signature='', out_signature='s')
     def Status(self):
-        if self.app.is_recording:
+        if self.app.is_loading_model:
+            return "loading"
+        elif self.app.is_recording:
             return "recording"
         elif self.app.is_processing:
             return "processing"
         else:
             return "idle"
 
+    @dbus.service.signal(DBUS_SERVICE, signature='ad')
+    def AudioLevels(self, levels):
+        """Signal mit aktuellen Audio-Levels (Array von doubles 0.0-1.0)."""
+        pass
+
+    @dbus.service.signal(DBUS_SERVICE, signature='sd')
+    def ModelProgress(self, message, progress):
+        """Signal für Modell-Lade-Fortschritt (message, 0.0-1.0)."""
+        pass
+
 
 class Transcriber:
     """Whisper-Transkription für vollständige Audio-Aufnahmen."""
 
-    def __init__(self, model_size="base"):
+    def __init__(self, model_size="base", progress_callback=None):
         self.model_size = model_size
         self.model = None
         self.sample_rate = 16000
+        self._progress_callback = progress_callback
+
+    def _report_progress(self, message, progress):
+        """Meldet Fortschritt über Callback."""
+        if self._progress_callback:
+            self._progress_callback(message, progress)
+
+    def _is_model_cached(self):
+        """Prüft ob das Modell bereits lokal vorhanden ist."""
+        try:
+            from huggingface_hub import try_to_load_from_cache
+            # faster-whisper nutzt CTranslate2-Modelle von Systran
+            repo_id = f"Systran/faster-whisper-{self.model_size}"
+            result = try_to_load_from_cache(repo_id, "model.bin")
+            return result is not None
+        except Exception:
+            # Falls wir den Cache-Status nicht prüfen können, nehmen wir an
+            # dass es nicht gecached ist — besser einmal zu viel Progress zeigen
+            return False
 
     def load_model(self):
         """Lädt das Whisper-Modell."""
         if self.model is None:
-            print(f"Lade Whisper-Modell '{self.model_size}'...")
+            cached = self._is_model_cached()
+
+            if not cached:
+                self._report_progress(
+                    f"Lade Modell '{self.model_size}' herunter...", 0.0)
+                print(f"Modell '{self.model_size}' wird heruntergeladen...")
+            else:
+                self._report_progress(
+                    f"Lade Modell '{self.model_size}'...", 0.5)
+                print(f"Lade Whisper-Modell '{self.model_size}' aus Cache...")
+
             from faster_whisper import WhisperModel
             self.model = WhisperModel(
                 self.model_size,
                 device="cpu",
                 compute_type="int8"
             )
+            self._report_progress("Modell geladen", 1.0)
         return self.model
 
     def transcribe(self, audio_data):
@@ -156,10 +202,11 @@ class Transcriber:
             return ""
 
 
-class JanewayDictate:
+class JtDictate:
     def __init__(self):
         self.is_recording = False
         self.is_processing = False
+        self.is_loading_model = False
         self.recording_thread = None
         self._audio_buffer = []
         self._audio_lock = threading.Lock()
@@ -170,9 +217,10 @@ class JanewayDictate:
         # Einstellungen laden
         self.settings = Settings()
 
-        # Transcriber
+        # Transcriber mit Progress-Callback
         self.transcriber = Transcriber(
             model_size=self.settings.get("model"),
+            progress_callback=self._on_model_progress,
         )
 
         # Notification initialisieren
@@ -206,7 +254,7 @@ class JanewayDictate:
                 replace_existing=True,
                 allow_replacement=False
             )
-            self.dbus_obj = JanewayDictateDBus(self, self._bus, DBUS_PATH)
+            self.dbus_obj = JtDictateDBus(self, self._bus, DBUS_PATH)
             print(f"D-Bus Service gestartet: {DBUS_SERVICE}")
         except dbus.exceptions.NameExistsException:
             print(f"{APP_NAME} läuft bereits (D-Bus Name belegt).")
@@ -215,8 +263,17 @@ class JanewayDictate:
             print(f"D-Bus Fehler: {e}")
             self.dbus_obj = None
 
+    def _on_model_progress(self, message, progress):
+        """Callback für Modell-Lade-Fortschritt."""
+        if self.dbus_obj:
+            GLib.idle_add(self.dbus_obj.ModelProgress, message, float(progress))
+        if progress >= 1.0:
+            self.is_loading_model = False
+
     def toggle_recording(self):
         """Startet oder stoppt die Aufnahme."""
+        if self.is_loading_model:
+            return  # Warte bis Modell geladen
         if self.is_recording:
             self.stop_recording()
         else:
@@ -224,7 +281,7 @@ class JanewayDictate:
 
     def start_recording(self):
         """Startet die Aufnahme."""
-        if self.is_recording:
+        if self.is_recording or self.is_loading_model:
             return
 
         global sounddevice
@@ -238,8 +295,37 @@ class JanewayDictate:
         # Modell ggf. mit neuem Model-Size neu laden
         current_model = self.settings.get("model")
         if current_model != self.transcriber.model_size:
-            self.transcriber = Transcriber(model_size=current_model)
+            self.transcriber = Transcriber(
+                model_size=current_model,
+                progress_callback=self._on_model_progress,
+            )
 
+        # Modell vorladen (zeigt Progress wenn Download nötig)
+        if self.transcriber.model is None:
+            self.is_loading_model = True
+            threading.Thread(target=self._preload_model_then_record, daemon=True).start()
+            return
+
+        self._begin_recording()
+
+    def _preload_model_then_record(self):
+        """Lädt das Modell in einem separaten Thread, startet dann die Aufnahme."""
+        try:
+            self.transcriber.load_model()
+        except Exception as e:
+            self.is_loading_model = False
+            GLib.idle_add(self.show_notification, "Fehler",
+                          f"Modell konnte nicht geladen werden: {e}")
+            print(f"Modell-Lade-Fehler: {e}")
+            return
+        self.is_loading_model = False
+        # Starte Aufnahme im Main-Thread
+        GLib.idle_add(self._begin_recording)
+
+    def _begin_recording(self):
+        """Startet die eigentliche Aufnahme (Modell bereits geladen)."""
+        if self.is_recording:
+            return
         self.is_recording = True
         with self._audio_lock:
             self._audio_buffer = []
@@ -250,12 +336,18 @@ class JanewayDictate:
         self.recording_thread.daemon = True
         self.recording_thread.start()
 
+        self._play_sound("start")
         self.show_notification("Aufnahme gestartet", "Sprich jetzt...")
         print("Aufnahme gestartet...")
 
     def _record_audio(self):
         """Nimmt Audio auf und sammelt alle Daten in einem Buffer."""
         blocksize = 1024
+        # Für Level-Berechnung: sammle Samples zwischen Level-Updates
+        level_samples = []
+        level_interval = 0.06  # ~60ms, passend zu 16fps Animation
+        last_level_time = time.time()
+        num_bands = 16  # Anzahl Frequenzbänder für Visualisierung
 
         try:
             with sounddevice.InputStream(
@@ -266,12 +358,63 @@ class JanewayDictate:
             ) as stream:
                 while self.is_recording:
                     data, overflowed = stream.read(blocksize)
+                    flat = data.flatten().copy()
                     with self._audio_lock:
-                        self._audio_buffer.append(data.flatten().copy())
+                        self._audio_buffer.append(flat)
+
+                    level_samples.append(flat)
+
+                    now = time.time()
+                    if now - last_level_time >= level_interval:
+                        last_level_time = now
+                        # Berechne Frequenzbänder via FFT
+                        try:
+                            chunk = np.concatenate(level_samples)
+                            level_samples = []
+                            levels = self._compute_band_levels(chunk, num_bands)
+                            if self.dbus_obj:
+                                GLib.idle_add(self.dbus_obj.AudioLevels,
+                                              dbus.Array(levels, signature='d'))
+                        except Exception:
+                            level_samples = []
 
         except Exception as e:
             print(f"Aufnahme-Fehler: {e}")
             GLib.idle_add(self.show_notification, "Fehler", str(e))
+
+    def _compute_band_levels(self, audio_chunk, num_bands):
+        """Berechnet Frequenzband-Levels aus einem Audio-Chunk via FFT."""
+        if len(audio_chunk) < 64:
+            return [0.0] * num_bands
+
+        # FFT berechnen
+        fft = np.abs(np.fft.rfft(audio_chunk))
+        # Nur relevanten Frequenzbereich (bis ~8kHz bei 16kHz Sample Rate)
+        freqs = np.fft.rfftfreq(len(audio_chunk), 1.0 / self.sample_rate)
+
+        # Logarithmische Frequenzbänder (menschliche Wahrnehmung)
+        min_freq = 80
+        max_freq = min(7500, self.sample_rate / 2)
+        band_edges = np.logspace(
+            np.log10(min_freq), np.log10(max_freq), num_bands + 1
+        )
+
+        levels = []
+        for i in range(num_bands):
+            low = band_edges[i]
+            high = band_edges[i + 1]
+            mask = (freqs >= low) & (freqs < high)
+            if np.any(mask):
+                band_energy = np.mean(fft[mask])
+                # Normalisieren: dB-Skala, dann auf 0-1 mappen
+                db = 20 * np.log10(max(band_energy, 1e-10))
+                # Typischer Bereich: -60dB (Stille) bis -5dB (laut)
+                normalized = max(0.0, min(1.0, (db + 55) / 50))
+                levels.append(float(normalized))
+            else:
+                levels.append(0.0)
+
+        return levels
 
     def stop_recording(self):
         """Stoppt die Aufnahme."""
@@ -280,6 +423,7 @@ class JanewayDictate:
 
         self.is_recording = False
         self.is_processing = True
+        self._play_sound("stop")
 
         # Finalisierung in separatem Thread, damit D-Bus sofort antwortet
         threading.Thread(target=self._finalize_recording, daemon=True).start()
@@ -335,6 +479,53 @@ class JanewayDictate:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
 
+    def _play_sound(self, sound_type):
+        """Spielt einen Start/Stop-Sound ab."""
+        try:
+            if not self.settings.get("sound_enabled"):
+                return
+            volume = self.settings.get("sound_volume")
+            if volume <= 0:
+                return
+
+            sound_setting = self.settings.get(f"sound_{sound_type}")
+            if sound_setting == "none":
+                return
+
+            if sound_setting and sound_setting != "default" and os.path.isfile(sound_setting):
+                # Eigene Sound-Datei
+                sound_file = sound_setting
+            else:
+                # System-Sound verwenden
+                if sound_type == "start":
+                    sound_id = "bell"
+                else:
+                    sound_id = "complete"
+                # Versuche canberra-gtk-play (Standard auf GNOME)
+                subprocess.Popen(
+                    ["canberra-gtk-play", "-i", sound_id,
+                     f"--volume={self._volume_to_db(volume)}"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                return
+
+            # Eigene Datei via paplay abspielen
+            subprocess.Popen(
+                ["paplay", f"--volume={int(volume * 65536)}", sound_file],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        except Exception:
+            pass  # Sound ist nicht kritisch
+
+    @staticmethod
+    def _volume_to_db(volume):
+        """Konvertiert 0.0-1.0 Volume zu dB-String für canberra."""
+        import math
+        if volume <= 0:
+            return "-100"
+        db = 20 * math.log10(volume)
+        return f"{db:.0f}"
+
     def show_notification(self, title, message):
         """Zeigt Notification."""
         try:
@@ -366,8 +557,8 @@ class JanewayDictate:
         print(f"D-Bus: {DBUS_SERVICE}")
         print("")
         print("Steuerung über GNOME Shell Extension oder CLI:")
-        print(f"  janeway-dictate --toggle")
-        print(f"  janeway-dictate --status")
+        print(f"  jt-dictate --toggle")
+        print(f"  jt-dictate --status")
         print("")
 
         self._mainloop = GLib.MainLoop()
@@ -404,11 +595,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Beispiele:
-  janeway-dictate              Startet das Backend
-  janeway-dictate --toggle     Startet/Stoppt Aufnahme (für Tastenkürzel)
-  janeway-dictate --start      Startet Aufnahme
-  janeway-dictate --stop       Stoppt Aufnahme
-  janeway-dictate --status     Zeigt aktuellen Status
+  jt-dictate              Startet das Backend
+  jt-dictate --toggle     Startet/Stoppt Aufnahme (für Tastenkürzel)
+  jt-dictate --start      Startet Aufnahme
+  jt-dictate --stop       Stoppt Aufnahme
+  jt-dictate --status     Zeigt aktuellen Status
 """
     )
 
@@ -440,7 +631,7 @@ Beispiele:
         else:
             if command in ["toggle", "start"]:
                 print("Keine laufende Instanz gefunden. Starte Backend...")
-                app = JanewayDictate()
+                app = JtDictate()
                 GLib.timeout_add(500, app.start_recording)
                 app.run()
             else:
@@ -456,7 +647,7 @@ Beispiele:
         except dbus.exceptions.DBusException:
             pass
 
-        app = JanewayDictate()
+        app = JtDictate()
         app.run()
 
 
