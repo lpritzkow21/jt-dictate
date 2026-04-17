@@ -1,8 +1,8 @@
 {
   "name": "JT Dictate",
-  "description": "Speech-to-Text für GNOME - Push-to-Talk mit Recording Pill, Audio-Visualisierung und Theme-System",
+  "description": "Speech-to-Text für GNOME - Push-to-Talk mit Recording Pill, Audio-Visualisierung, Animationen und Theme-System",
   "uuid": "jt-dictate@jt.tools",
   "shell-version": ["45", "46", "47", "48", "49"],
-  "version": 2,
+  "version": 3,
   "url": "https://github.com/lpritzkow21/jt-dictate"
 }

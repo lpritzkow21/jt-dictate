@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JT Dictate - GNOME Extension Simulation</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    width: 100vw; height: 100vh; overflow: hidden;
+    font-family: 'Cantarell', 'Segoe UI', system-ui, sans-serif;
+    background: url('wallpaper.png') center/cover no-repeat, linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff; user-select: none; cursor: default;
+}
+
+/* === GNOME Top Bar === */
+#topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 32px; z-index: 1000;
+    background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 500; padding: 0 8px;
+}
+#topbar-left { display: flex; align-items: center; gap: 12px; }
+#topbar-center { position: absolute; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 500; }
+#topbar-right { display: flex; align-items: center; gap: 10px; }
+.topbar-btn { padding: 2px 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+.topbar-btn:hover { background: rgba(255,255,255,0.12); }
+
+#panel-mic-btn { display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+#panel-mic-btn:hover { background: rgba(255,255,255,0.12); }
+#panel-mic-btn.recording { color: #e01b24; }
+#panel-mic-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+.topbar-icon { font-size: 14px; opacity: 0.9; }
+
+/* === Desktop Hint === */
+#desktop-hint {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;
+    background: rgba(0,0,0,0.45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 32px 48px;
+    text-align: center; max-width: 520px;
+}
+#desktop-hint h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+#desktop-hint p { font-size: 13px; opacity: 0.7; line-height: 1.5; }
+#desktop-hint kbd {
+    display: inline-block; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px; padding: 1px 7px; font-family: monospace; font-size: 12px;
+}
+
+/* === Info Panel === */
+#info-panel {
+    position: fixed; bottom: 16px; left: 16px; z-index: 100;
+    background: rgba(0,0,0,0.45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 20px;
+    font-size: 12px; line-height: 1.7; min-width: 220px;
+}
+#info-panel .label { opacity: 0.5; display: inline-block; min-width: 70px; }
+#info-panel .value { opacity: 0.9; }
+
+/* === Context Menu === */
+#context-menu {
+    display: none; position: fixed; z-index: 2000;
+    background: #3d3d4e; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 260px; padding: 6px 0;
+    font-size: 13px;
+}
+#context-menu.visible { display: block; }
+.ctx-item {
+    padding: 8px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+    transition: background 0.1s;
+}
+.ctx-item:hover { background: rgba(255,255,255,0.08); }
+.ctx-item.disabled { opacity: 0.4; cursor: default; }
+.ctx-item.disabled:hover { background: none; }
+.ctx-separator { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 12px; }
+.ctx-check { opacity: 0.6; font-size: 12px; }
+.ctx-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; display: inline-block; }
+.ctx-model-row { display: flex; align-items: center; }
+
+/* === Recording Pill === */
+#recording-pill {
+    position: fixed; z-index: 500; display: none; align-items: center; justify-content: center;
+    transition: none;
+}
+#recording-pill.visible { display: flex; }
+#pill-inner {
+    display: flex; align-items: center; justify-content: center; gap: 0; overflow: hidden;
+    transition: none; position: relative;
+}
+#pill-icon { display: flex; align-items: center; justify-content: center; margin-right: 8px; flex-shrink: 0; }
+#pill-icon svg { width: 20px; height: 20px; fill: currentColor; }
+#pill-viz { display: flex; align-items: center; gap: 3px; height: 100%; flex-shrink: 0; }
+
+#pill-spinner {
+    display: none; align-items: center; justify-content: center;
+    position: absolute; inset: 0;
+}
+#pill-spinner svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#pill-checkmark {
+    display: none; align-items: center; justify-content: center;
+    position: absolute; inset: 0;
+}
+
+/* === Settings Window === */
+#settings-overlay {
+    display: none; position: fixed; inset: 0; z-index: 3000;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+}
+#settings-overlay.visible { display: flex; }
+
+#settings-window {
+    width: 700px; max-height: 80vh; background: #242434; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+#settings-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 0 20px; flex-shrink: 0;
+}
+#settings-header h2 { font-size: 16px; font-weight: 600; }
+#settings-close {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.08); color: #fff; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: background 0.15s;
+}
+#settings-close:hover { background: rgba(255,255,255,0.16); }
+
+#settings-tabs {
+    display: flex; gap: 0; padding: 12px 20px 0 20px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.settings-tab {
+    padding: 8px 18px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border-bottom: 2px solid transparent; opacity: 0.6; transition: all 0.15s;
+    background: none; border: none; border-bottom: 2px solid transparent; color: #fff;
+}
+.settings-tab:hover { opacity: 0.8; }
+.settings-tab.active { opacity: 1; border-bottom-color: #3584e4; }
+
+#settings-body { flex: 1; overflow-y: auto; padding: 16px 20px 20px 20px; }
+#settings-body::-webkit-scrollbar { width: 6px; }
+#settings-body::-webkit-scrollbar-track { background: transparent; }
+#settings-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+.settings-page { display: none; }
+.settings-page.active { display: block; }
+
+.settings-group {
+    background: rgba(255,255,255,0.04); border-radius: 10px; padding: 16px;
+    margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.04);
+}
+.settings-group h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.settings-group .group-desc { font-size: 11px; opacity: 0.45; margin-bottom: 12px; }
+
+.setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; min-height: 38px;
+}
+.setting-row + .setting-row { border-top: 1px solid rgba(255,255,255,0.04); }
+.setting-label { flex: 1; }
+.setting-label .title { font-size: 13px; }
+.setting-label .subtitle { font-size: 11px; opacity: 0.4; }
+.setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Toggle switch */
+.toggle-switch {
+    width: 40px; height: 22px; border-radius: 11px; cursor: pointer; position: relative;
+    background: rgba(255,255,255,0.15); transition: background 0.2s;
+}
+.toggle-switch.on { background: #3584e4; }
+.toggle-switch::after {
+    content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; top: 3px; left: 3px; transition: transform 0.2s;
+}
+.toggle-switch.on::after { transform: translateX(18px); }
+
+/* Inputs */
+.s-select {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; color: #fff; padding: 4px 8px; font-size: 12px; cursor: pointer;
+    min-width: 120px;
+}
+.s-select option { background: #2a2a3a; color: #fff; }
+
+.s-number {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; color: #fff; padding: 4px 8px; font-size: 12px; width: 80px; text-align: center;
+}
+.s-number::-webkit-inner-spin-button { opacity: 1; }
+
+.s-range { width: 120px; accent-color: #3584e4; }
+
+.s-color {
+    width: 36px; height: 28px; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
+    cursor: pointer; background: none; padding: 1px;
+}
+.s-color::-webkit-color-swatch-wrapper { padding: 0; }
+.s-color::-webkit-color-swatch { border: none; border-radius: 4px; }
+
+.s-alpha-slider { width: 80px; accent-color: #3584e4; }
+
+.s-button {
+    background: #3584e4; color: #fff; border: none; border-radius: 6px;
+    padding: 6px 16px; font-size: 12px; cursor: pointer; font-weight: 500;
+    transition: background 0.15s;
+}
+.s-button:hover { background: #4a9cf5; }
+.s-button.secondary { background: rgba(255,255,255,0.08); }
+.s-button.secondary:hover { background: rgba(255,255,255,0.14); }
+
+.play-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.08); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 10px;
+    transition: background 0.15s; flex-shrink: 0;
+}
+.play-btn:hover { background: rgba(255,255,255,0.16); }
+
+.sound-row { display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<!-- GNOME Top Bar -->
+<div id="topbar">
+    <div id="topbar-left">
+        <span class="topbar-btn">Aktivit&auml;ten</span>
+    </div>
+    <div id="topbar-center">
+        <span id="clock"></span>
+    </div>
+    <div id="topbar-right">
+        <div id="panel-mic-btn" title="JT Dictate">
+            <svg viewBox="0 0 16 16"><path d="M8 1a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0v-4A2.5 2.5 0 0 0 8 1zM4 6.5a.5.5 0 0 0-1 0 5 5 0 0 0 4.5 4.975V13.5H6a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H8.5v-2.025A5 5 0 0 0 13 6.5a.5.5 0 0 0-1 0 4 4 0 0 1-8 0z"/></svg>
+        </div>
+        <span class="topbar-icon">DE</span>
+        <span class="topbar-icon">&#128266;</span>
+        <span class="topbar-icon">&#128267;</span>
+    </div>
+</div>
+
+<!-- Desktop Hint -->
+<div id="desktop-hint">
+    <h2>JT Dictate Simulation</h2>
+    <p>
+        <kbd>Leertaste</kbd> oder <strong>Klick auf Mikrofon-Icon</strong> zum Aufnehmen<br>
+        <kbd>Rechtsklick</kbd> auf Icon f&uuml;r Kontextmen&uuml;<br>
+        Einstellungen &uuml;ber Kontextmen&uuml; &rarr; <em>Alle Einstellungen...</em>
+    </p>
+</div>
+
+<!-- Info Panel -->
+<div id="info-panel">
+    <div><span class="label">Status:</span> <span class="value" id="info-status">Bereit</span></div>
+    <div><span class="label">Steuerung:</span> <span class="value">Leertaste / Klick</span></div>
+    <div><span class="label">Phase:</span> <span class="value" id="info-phase">Idle</span></div>
+</div>
+
+<!-- Context Menu -->
+<div id="context-menu">
+    <div class="ctx-item disabled" id="ctx-status">Status: Bereit</div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-toggle">Aufnahme starten</div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-clipboard">
+        <span>Auto-Clipboard</span>
+        <span class="ctx-check" id="ctx-clipboard-check">&#10003;</span>
+    </div>
+    <div class="ctx-item" id="ctx-notifications">
+        <span>GNOME-Benachrichtigungen</span>
+        <span class="ctx-check" id="ctx-notifications-check"></span>
+    </div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-model-tiny"><span class="ctx-model-row"><span class="ctx-dot" style="opacity:0" id="dot-tiny"></span>tiny</span></div>
+    <div class="ctx-item" id="ctx-model-base"><span class="ctx-model-row"><span class="ctx-dot" id="dot-base"></span>base</span></div>
+    <div class="ctx-item" id="ctx-model-small"><span class="ctx-model-row"><span class="ctx-dot" style="opacity:0" id="dot-small"></span>small</span></div>
+    <div class="ctx-item" id="ctx-model-medium"><span class="ctx-model-row"><span class="ctx-dot" style="opacity:0" id="dot-medium"></span>medium</span></div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctx-settings">Alle Einstellungen...</div>
+</div>
+
+<!-- Recording Pill -->
+<div id="recording-pill">
+    <div id="pill-inner">
+        <div id="pill-icon">
+            <svg viewBox="0 0 16 16"><path d="M8 1a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0v-4A2.5 2.5 0 0 0 8 1zM4 6.5a.5.5 0 0 0-1 0 5 5 0 0 0 4.5 4.975V13.5H6a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H8.5v-2.025A5 5 0 0 0 13 6.5a.5.5 0 0 0-1 0 4 4 0 0 1-8 0z"/></svg>
+        </div>
+        <div id="pill-viz"></div>
+        <div id="pill-spinner">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.15"/>
+                <path d="M12 2 a10 10 0 0 1 10 10" id="spinner-arc"/>
+            </svg>
+        </div>
+        <div id="pill-checkmark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4,12 10,18 20,6"/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Overlay -->
+<div id="settings-overlay">
+    <div id="settings-window">
+        <div id="settings-header">
+            <h2>JT Dictate - Einstellungen</h2>
+            <button id="settings-close">&times;</button>
+        </div>
+        <div id="settings-tabs">
+            <button class="settings-tab active" data-tab="pill">Aufnahme-Pill</button>
+            <button class="settings-tab" data-tab="visualization">Visualisierung</button>
+            <button class="settings-tab" data-tab="sound">Sound</button>
+            <button class="settings-tab" data-tab="data">Theme &amp; Daten</button>
+        </div>
+        <div id="settings-body"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+//  SETTINGS & CONSTANTS
+// ============================================================
+
+const THEME_PRESETS = {
+    'default': { name:'Standard', pill_bg_color:'rgba(15,15,25,0.82)', pill_border_color:'rgba(255,255,255,0.12)', pill_border_width:1, pill_blur:12, pill_shadow_intensity:0.4, bar_color_left:'#6c9ff8', bar_color_right:'#f06292', bar_gradient:true, icon_color:'#e8eaed', recording_color:'#ef5350', processing_color:'#ffa726', spinner_color:'#ffa726', checkmark_color:'#66bb6a' },
+    'neon': { name:'Neon', pill_bg_color:'rgba(0,0,0,0.85)', pill_border_color:'#00ff88', pill_border_width:2, pill_blur:10, pill_shadow_intensity:0.6, bar_color_left:'#00ff88', bar_color_right:'#ff0088', bar_gradient:true, icon_color:'#00ff88', recording_color:'#ff0044', processing_color:'#ffaa00', spinner_color:'#ffaa00', checkmark_color:'#00ff88' },
+    'minimal': { name:'Minimal', pill_bg_color:'rgba(0,0,0,0.5)', pill_border_color:'rgba(255,255,255,0.05)', pill_border_width:0, pill_blur:0, pill_shadow_intensity:0, bar_color_left:'#ffffff', bar_color_right:'#ffffff', bar_gradient:false, icon_color:'#ffffff', recording_color:'#e01b24', processing_color:'#e5a50a', spinner_color:'#ffffff', checkmark_color:'#ffffff' },
+    'ocean': { name:'Ocean', pill_bg_color:'rgba(10,25,47,0.85)', pill_border_color:'#1a73e8', pill_border_width:1, pill_blur:8, pill_shadow_intensity:0.4, bar_color_left:'#00bcd4', bar_color_right:'#1a73e8', bar_gradient:true, icon_color:'#80deea', recording_color:'#ff5252', processing_color:'#ffab40', spinner_color:'#ffab40', checkmark_color:'#00bcd4' },
+    'sunset': { name:'Sunset', pill_bg_color:'rgba(30,10,10,0.85)', pill_border_color:'#ff6b35', pill_border_width:1, pill_blur:6, pill_shadow_intensity:0.5, bar_color_left:'#ff6b35', bar_color_right:'#f7c948', bar_gradient:true, icon_color:'#f7c948', recording_color:'#e01b24', processing_color:'#ff6b35', spinner_color:'#ff6b35', checkmark_color:'#f7c948' },
+    'aurora': { name:'Aurora', pill_bg_color:'rgba(10,8,30,0.88)', pill_border_color:'#7c4dff', pill_border_width:1, pill_blur:14, pill_shadow_intensity:0.5, bar_color_left:'#7c4dff', bar_color_right:'#00e5ff', bar_gradient:true, icon_color:'#b388ff', recording_color:'#ff1744', processing_color:'#ffab00', spinner_color:'#00e5ff', checkmark_color:'#69f0ae' },
+    'cherry': { name:'Cherry', pill_bg_color:'rgba(40,5,15,0.85)', pill_border_color:'#e91e63', pill_border_width:1, pill_blur:8, pill_shadow_intensity:0.45, bar_color_left:'#e91e63', bar_color_right:'#ff6090', bar_gradient:true, icon_color:'#fce4ec', recording_color:'#d50000', processing_color:'#ff6d00', spinner_color:'#ff6090', checkmark_color:'#f8bbd0' },
+    'forest': { name:'Forest', pill_bg_color:'rgba(5,20,10,0.85)', pill_border_color:'#2e7d32', pill_border_width:1, pill_blur:10, pill_shadow_intensity:0.4, bar_color_left:'#43a047', bar_color_right:'#81c784', bar_gradient:true, icon_color:'#c8e6c9', recording_color:'#ff5252', processing_color:'#ffb74d', spinner_color:'#81c784', checkmark_color:'#a5d6a7' },
+    'midnight': { name:'Midnight', pill_bg_color:'rgba(5,5,15,0.9)', pill_border_color:'rgba(100,120,255,0.2)', pill_border_width:1, pill_blur:16, pill_shadow_intensity:0.5, bar_color_left:'#5c6bc0', bar_color_right:'#7986cb', bar_gradient:true, icon_color:'#9fa8da', recording_color:'#ef5350', processing_color:'#ffd54f', spinner_color:'#7986cb', checkmark_color:'#80cbc4' },
+    'rose': { name:'Ros\u00e9', pill_bg_color:'rgba(30,15,20,0.82)', pill_border_color:'rgba(255,150,170,0.2)', pill_border_width:1, pill_blur:12, pill_shadow_intensity:0.35, bar_color_left:'#f48fb1', bar_color_right:'#ce93d8', bar_gradient:true, icon_color:'#f8bbd0', recording_color:'#e53935', processing_color:'#ffb74d', spinner_color:'#ce93d8', checkmark_color:'#a5d6a7' },
+};
+
+const BUILTIN_SOUNDS = [
+    {id:'gentle-ping', name:'Gentle Ping'}, {id:'bubble', name:'Bubble'}, {id:'chime', name:'Chime'},
+    {id:'click', name:'Click'}, {id:'cosmic', name:'Cosmic'}, {id:'crystal', name:'Crystal'},
+    {id:'drop', name:'Drop'}, {id:'echo', name:'Echo'}, {id:'fairy', name:'Fairy'},
+    {id:'glow', name:'Glow'}, {id:'harp', name:'Harp'}, {id:'laser', name:'Laser'},
+    {id:'nudge', name:'Nudge'}, {id:'pluck', name:'Pluck'}, {id:'whoosh', name:'Whoosh'},
+];
+
+const VISUALIZATION_TYPES = [
+    {id:'bars', name:'Balken'}, {id:'waveform', name:'Waveform'}, {id:'pulse', name:'Puls'},
+    {id:'circle', name:'Kreis'}, {id:'equalizer', name:'Equalizer'},
+];
+
+const ANIMATION_STYLES = [
+    {id:'smooth', name:'Smooth'}, {id:'bounce', name:'Bounce'}, {id:'minimal', name:'Minimal'},
+];
+
+const ICON_OPTIONS = [
+    {id:'audio-input-microphone-symbolic', name:'Mikrofon'},
+    {id:'media-record-symbolic', name:'Aufnahme'},
+    {id:'audio-speakers-symbolic', name:'Lautsprecher'},
+    {id:'emblem-music-symbolic', name:'Musik'},
+    {id:'face-smile-symbolic', name:'Smiley'},
+    {id:'custom', name:'Eigenes Icon...'},
+];
+
+const POSITIONS = [
+    {id:'top-center', name:'Oben Mitte'}, {id:'top-left', name:'Oben Links'},
+    {id:'top-right', name:'Oben Rechts'}, {id:'bottom-center', name:'Unten Mitte'},
+    {id:'bottom-left', name:'Unten Links'}, {id:'bottom-right', name:'Unten Rechts'},
+];
+
+const ICON_SVGS = {
+    'audio-input-microphone-symbolic': '<path d="M8 1a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0v-4A2.5 2.5 0 0 0 8 1zM4 6.5a.5.5 0 0 0-1 0 5 5 0 0 0 4.5 4.975V13.5H6a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H8.5v-2.025A5 5 0 0 0 13 6.5a.5.5 0 0 0-1 0 4 4 0 0 1-8 0z"/>',
+    'media-record-symbolic': '<circle cx="8" cy="8" r="6"/>',
+    'audio-speakers-symbolic': '<path d="M3 5v6h2l4 4V1L5 5H3z"/>',
+    'emblem-music-symbolic': '<path d="M12 2v9.5a2.5 2.5 0 1 1-1-2V4H7v7.5a2.5 2.5 0 1 1-1-2V2h6z"/>',
+    'face-smile-symbolic': '<circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="6.5" r="0.8"/><circle cx="10.5" cy="6.5" r="0.8"/><path d="M5 10c.8 1.2 2.2 2 3 2s2.2-.8 3-2" fill="none" stroke="currentColor" stroke-width="1"/>',
+};
+
+let S = {
+    auto_clipboard: true, model: 'base', language: null,
+    pill_width: 200, pill_height: 40, pill_border_radius: 20,
+    pill_bg_color: 'rgba(15,15,25,0.82)', pill_border_color: 'rgba(255,255,255,0.12)',
+    pill_border_width: 1, pill_blur: 12, pill_shadow_intensity: 0.4,
+    pill_margin_top: 60, pill_margin_horizontal: 0,
+    pill_position: 'bottom-center',
+    visualization_type: 'bars',
+    pill_animation: 'minimal',
+    bar_color_left: '#6c9ff8', bar_color_right: '#f06292',
+    bar_gradient: true, bar_count: 15,
+    icon_name: 'audio-input-microphone-symbolic', icon_color: '#e8eaed',
+    custom_icon_path: '', recording_color: '#ef5350', processing_color: '#ffa726',
+    spinner_color: '#ffa726', checkmark_color: '#66bb6a',
+    active_theme: 'default', follow_system_theme: false,
+    sound_enabled: true,
+    sound_start_volume: 0.5, sound_stop_volume: 0.5, sound_finish_volume: 0.7,
+    sound_start: 'click', sound_stop: 'click', sound_finish: 'gentle-ping',
+    notifications_enabled: false,
+    processing_position: 'bottom-right',
+    processing_margin_bottom: 28, processing_margin_horizontal: 28,
+    processing_size: 44,
+    checkmark_effect: 'fade',
+};
+
+// ============================================================
+//  STATE
+// ============================================================
+let state = 'idle'; // idle | recording | processing | done
+let vizAnimId = null;
+let vizPhase = 0;
+let prevLevels = [];
+let settingsOpen = false;
+
+// ============================================================
+//  CLOCK
+// ============================================================
+function updateClock() {
+    const now = new Date();
+    const d = now.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+    const t = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('clock').textContent = d + '  ' + t;
+}
+updateClock();
+setInterval(updateClock, 10000);
+
+// ============================================================
+//  SOUND
+// ============================================================
+function playSound(key) {
+    if (!S.sound_enabled) return;
+    var id = S[key];
+    if (!id || id === 'none') return;
+    if (id === 'default') id = 'gentle-ping';
+    if (id.startsWith('builtin:')) id = id.slice(8);
+    var volKey = key + '_volume';
+    var vol = S[volKey] !== undefined ? S[volKey] : 0.5;
+    try {
+        var a = new Audio('extension/sounds/' + id + '.wav');
+        a.volume = vol;
+        a.play().catch(function() {});
+    } catch(e) {}
+}
+
+// ============================================================
+//  CONTEXT MENU
+// ============================================================
+const ctxMenu = document.getElementById('context-menu');
+
+function openContextMenu(x, y) {
+    updateContextMenu();
+    ctxMenu.style.left = x + 'px';
+    ctxMenu.style.top = y + 'px';
+    ctxMenu.classList.add('visible');
+    const r = ctxMenu.getBoundingClientRect();
+    if (r.right > window.innerWidth) ctxMenu.style.left = (window.innerWidth - r.width - 4) + 'px';
+    if (r.bottom > window.innerHeight) ctxMenu.style.top = (window.innerHeight - r.height - 4) + 'px';
+}
+
+function closeContextMenu() { ctxMenu.classList.remove('visible'); }
+
+function updateContextMenu() {
+    document.getElementById('ctx-status').textContent = 'Status: ' + (state === 'idle' ? 'Bereit' : state === 'recording' ? 'Aufnahme...' : 'Verarbeitung...');
+    document.getElementById('ctx-toggle').textContent = state === 'recording' ? 'Aufnahme stoppen' : 'Aufnahme starten';
+    document.getElementById('ctx-clipboard-check').textContent = S.auto_clipboard ? '\u2713' : '';
+    document.getElementById('ctx-notifications-check').textContent = S.notifications_enabled ? '\u2713' : '';
+    ['tiny','base','small','medium'].forEach(m => {
+        document.getElementById('dot-' + m).style.opacity = S.model === m ? '1' : '0';
+    });
+}
+
+document.getElementById('ctx-toggle').onclick = () => { closeContextMenu(); toggleRecording(); };
+document.getElementById('ctx-clipboard').onclick = () => { S.auto_clipboard = !S.auto_clipboard; updateContextMenu(); };
+document.getElementById('ctx-notifications').onclick = () => { S.notifications_enabled = !S.notifications_enabled; updateContextMenu(); };
+['tiny','base','small','medium'].forEach(m => {
+    document.getElementById('ctx-model-' + m).onclick = () => { S.model = m; updateContextMenu(); };
+});
+document.getElementById('ctx-settings').onclick = () => { closeContextMenu(); openSettings(); };
+
+// Block all native context menus
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Close context menu on outside click
+document.addEventListener('mousedown', e => {
+    if (ctxMenu.classList.contains('visible') && !ctxMenu.contains(e.target)) closeContextMenu();
+});
+
+// ============================================================
+//  PANEL MIC BUTTON
+// ============================================================
+const MIC_ICON_PATH = 'M8 1a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0v-4A2.5 2.5 0 0 0 8 1zM4 6.5a.5.5 0 0 0-1 0 5 5 0 0 0 4.5 4.975V13.5H6a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H8.5v-2.025A5 5 0 0 0 13 6.5a.5.5 0 0 0-1 0 4 4 0 0 1-8 0z';
+const micBtn = document.getElementById('panel-mic-btn');
+micBtn.addEventListener('click', e => { if (e.button === 0) toggleRecording(); });
+micBtn.addEventListener('mousedown', e => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); openContextMenu(e.clientX, e.clientY); } });
+
+// ============================================================
+//  KEYBOARD
+// ============================================================
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        if (settingsOpen) { closeSettings(); return; }
+        closeContextMenu();
+        return;
+    }
+    if (e.key === ' ' && !settingsOpen) {
+        e.preventDefault();
+        toggleRecording();
+    }
+});
+
+// ============================================================
+//  PILL POSITIONING
+// ============================================================
+function getPillPosition() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x, y;
+    const pos = S.pill_position || 'bottom-center';
+    switch (pos) {
+        case 'top-left': x = S.pill_margin_horizontal; y = S.pill_margin_top + 32; break;
+        case 'top-right': x = vw - S.pill_width - S.pill_margin_horizontal; y = S.pill_margin_top + 32; break;
+        case 'top-center': x = (vw - S.pill_width) / 2 + S.pill_margin_horizontal; y = S.pill_margin_top + 32; break;
+        case 'bottom-left': x = S.pill_margin_horizontal; y = vh - S.pill_height - S.pill_margin_top; break;
+        case 'bottom-right': x = vw - S.pill_width - S.pill_margin_horizontal; y = vh - S.pill_height - S.pill_margin_top; break;
+        case 'bottom-center': default: x = (vw - S.pill_width) / 2 + S.pill_margin_horizontal; y = vh - S.pill_height - S.pill_margin_top; break;
+    }
+    return { x: Math.round(x), y: Math.round(y) };
+}
+
+function getProcessingPosition() {
+    var s = S.processing_size || 44;
+    var pos = S.processing_position || 'bottom-right';
+    var mb = S.processing_margin_bottom || 28;
+    var mh = S.processing_margin_horizontal || 28;
+    var x, y;
+    switch(pos) {
+        case 'bottom-right': x = window.innerWidth - s - mh; y = window.innerHeight - s - mb; break;
+        case 'bottom-left': x = mh; y = window.innerHeight - s - mb; break;
+        case 'bottom-center': x = (window.innerWidth - s) / 2; y = window.innerHeight - s - mb; break;
+        case 'top-right': x = window.innerWidth - s - mh; y = mb + 32; break;
+        case 'top-left': x = mh; y = mb + 32; break;
+        case 'top-center': x = (window.innerWidth - s) / 2; y = mb + 32; break;
+        default: x = window.innerWidth - s - mh; y = window.innerHeight - s - mb;
+    }
+    return {x: x, y: y};
+}
+
+// ============================================================
+//  PILL RENDERING
+// ============================================================
+const pill = document.getElementById('recording-pill');
+const pillInner = document.getElementById('pill-inner');
+const pillIcon = document.getElementById('pill-icon');
+const pillViz = document.getElementById('pill-viz');
+const pillSpinner = document.getElementById('pill-spinner');
+const pillCheckmark = document.getElementById('pill-checkmark');
+
+function applyPillStyle() {
+    const p = getPillPosition();
+    pill.style.left = p.x + 'px';
+    pill.style.top = p.y + 'px';
+    pill.style.width = S.pill_width + 'px';
+    pill.style.height = S.pill_height + 'px';
+    pill.style.transform = '';
+
+    let shadow = S.pill_shadow_intensity > 0 ? '0 4px 12px rgba(0,0,0,' + S.pill_shadow_intensity + ')' : 'none';
+    let blur = S.pill_blur > 0 ? 'blur(' + S.pill_blur + 'px)' : 'none';
+    pillInner.style.cssText =
+        'width:' + S.pill_width + 'px;height:' + S.pill_height + 'px;' +
+        'border-radius:' + S.pill_border_radius + 'px;' +
+        'background:' + S.pill_bg_color + ';' +
+        'border:' + S.pill_border_width + 'px solid ' + S.pill_border_color + ';' +
+        'box-shadow:' + shadow + ';' +
+        'backdrop-filter:' + blur + ';-webkit-backdrop-filter:' + blur + ';' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'padding:4px 12px;overflow:hidden;transition:none;';
+
+    // Icon
+    pillIcon.style.color = S.recording_color;
+    const iconKey = S.icon_name || 'audio-input-microphone-symbolic';
+    const svg = ICON_SVGS[iconKey] || ICON_SVGS['audio-input-microphone-symbolic'];
+    const iconSize = Math.max(16, S.pill_height - 16);
+    pillIcon.innerHTML = '<svg viewBox="0 0 16 16" style="width:' + iconSize + 'px;height:' + iconSize + 'px;fill:currentColor">' + svg + '</svg>';
+    pillIcon.style.display = 'flex';
+    pillIcon.style.opacity = '1';
+    pillIcon.style.marginRight = '8px';
+
+    // Visualization
+    pillViz.style.display = 'flex';
+    pillViz.style.opacity = '1';
+    pillSpinner.style.display = 'none';
+    pillCheckmark.style.display = 'none';
+}
+
+// ============================================================
+//  VISUALIZATION DRAWING (Canvas-based)
+// ============================================================
+function buildVizCanvas() {
+    pillViz.innerHTML = '';
+    const vizW = S.pill_width - 50;
+    const vizH = S.pill_height - 8;
+    const canvas = document.createElement('canvas');
+    canvas.width = vizW;
+    canvas.height = vizH;
+    canvas.style.width = vizW + 'px';
+    canvas.style.height = vizH + 'px';
+    canvas.id = 'viz-canvas';
+    pillViz.appendChild(canvas);
+}
+
+function parseColor(c) {
+    if (!c) return {r:1,g:1,b:1,a:1};
+    if (c.startsWith('rgba(')) {
+        const m = c.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+        if (m) return {r:+m[1]/255, g:+m[2]/255, b:+m[3]/255, a:+m[4]};
+    }
+    if (c.startsWith('rgb(')) {
+        const m = c.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+        if (m) return {r:+m[1]/255, g:+m[2]/255, b:+m[3]/255, a:1};
+    }
+    if (c.startsWith('#')) {
+        let h = c.slice(1);
+        if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+        return {r:parseInt(h.substring(0,2),16)/255, g:parseInt(h.substring(2,4),16)/255, b:parseInt(h.substring(4,6),16)/255, a:1};
+    }
+    return {r:1,g:1,b:1,a:1};
+}
+
+function lerp(a, b, t) {
+    return {r:a.r+(b.r-a.r)*t, g:a.g+(b.g-a.g)*t, b:a.b+(b.b-a.b)*t, a:a.a+(b.a-a.a)*t};
+}
+function rgba(c, alpha) {
+    return 'rgba(' + Math.round(c.r*255) + ',' + Math.round(c.g*255) + ',' + Math.round(c.b*255) + ',' + (c.a*(alpha||1)).toFixed(2) + ')';
+}
+
+function drawVisualization(levels) {
+    const canvas = document.getElementById('viz-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const lc = parseColor(S.bar_color_left);
+    const rc = parseColor(S.bar_color_right);
+    const count = S.bar_count;
+    if (!levels.length) levels = new Array(count).fill(0.05);
+
+    switch (S.visualization_type) {
+        case 'bars': drawBars(ctx, w, h, levels, lc, rc, count); break;
+        case 'waveform': drawWaveform(ctx, w, h, levels, lc, rc); break;
+        case 'pulse': drawPulse(ctx, w, h, levels, lc, rc); break;
+        case 'circle': drawCircle(ctx, w, h, levels, lc, rc, count); break;
+        case 'equalizer': drawEqualizer(ctx, w, h, levels, lc, rc, count); break;
+        default: drawBars(ctx, w, h, levels, lc, rc, count);
+    }
+}
+
+function drawBars(ctx, w, h, levels, lc, rc, count) {
+    const gap = 3;
+    let bw = (w - gap * (count - 1)) / count;
+    if (bw < 2) bw = 2;
+    for (let i = 0; i < count; i++) {
+        const lv = levels[i] || 0.05;
+        const bh = Math.max(4, lv * h);
+        const x = i * (bw + gap);
+        const y = (h - bh) / 2;
+        const c = S.bar_gradient ? lerp(lc, rc, i / Math.max(1, count - 1)) : lc;
+        ctx.fillStyle = rgba(c, 0.9);
+        const r = Math.min(bw / 2, 3);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + bw - r, y);
+        ctx.quadraticCurveTo(x + bw, y, x + bw, y + r);
+        ctx.lineTo(x + bw, y + bh - r);
+        ctx.quadraticCurveTo(x + bw, y + bh, x + bw - r, y + bh);
+        ctx.lineTo(x + r, y + bh);
+        ctx.quadraticCurveTo(x, y + bh, x, y + bh - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+function drawWaveform(ctx, w, h, levels, lc, rc) {
+    const count = Math.max(levels.length, 8);
+    const midY = h / 2;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    let points = [];
+    for (let i = 0; i <= count; i++) {
+        const t = i / count;
+        const x = t * w;
+        const lv = levels[i % levels.length] || 0.05;
+        const y = midY + Math.sin(vizPhase + i * 0.5) * lv * midY * 0.8;
+        points.push({x, y, t});
+    }
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i], p1 = points[i+1];
+        const c = S.bar_gradient ? lerp(lc, rc, (p0.t+p1.t)/2) : lc;
+        ctx.strokeStyle = rgba(c, 0.9);
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+    }
+    ctx.lineWidth = 1.5;
+    let mp = [];
+    for (let i = 0; i <= count; i++) {
+        const t = i / count;
+        const x = t * w;
+        const lv = levels[i % levels.length] || 0.05;
+        const y = midY - Math.sin(vizPhase + i * 0.5) * lv * midY * 0.6;
+        mp.push({x, y, t});
+    }
+    for (let i = 0; i < mp.length - 1; i++) {
+        const p0 = mp[i], p1 = mp[i+1];
+        const c = S.bar_gradient ? lerp(lc, rc, (p0.t+p1.t)/2) : lc;
+        ctx.strokeStyle = rgba(c, 0.35);
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+    }
+}
+
+function drawPulse(ctx, w, h, levels, lc, rc) {
+    const avg = levels.reduce((a,b) => a+b, 0) / Math.max(1, levels.length);
+    const maxR = Math.min(w, h) / 2 - 2;
+    const cx = w/2, cy = h/2;
+    for (let ring = 2; ring >= 0; ring--) {
+        let scale = 0.3 + avg * 0.7 - ring * 0.15;
+        if (scale < 0.1) scale = 0.1;
+        const r = Math.max(1, maxR * scale);
+        const alpha = (1 - ring * 0.3) * 0.7;
+        const c = lerp(lc, rc, ring / 2);
+        ctx.fillStyle = rgba(c, alpha);
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+function drawCircle(ctx, w, h, levels, lc, rc, count) {
+    const cx = w/2, cy = h/2;
+    const baseR = Math.min(w, h) / 2 - 4;
+    const segments = 90;
+    const step = (2 * Math.PI) / segments;
+    ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let i = 0; i < segments; i++) {
+        const a0 = i * step + vizPhase, a1 = (i+1) * step + vizPhase;
+        const li = Math.floor((i / segments) * count) % count;
+        const lv = levels[li] || 0.05;
+        const r = Math.max(1, baseR * (0.6 + lv * 0.4));
+        const x0 = cx + Math.cos(a0)*r, y0 = cy + Math.sin(a0)*r;
+        const x1 = cx + Math.cos(a1)*r, y1 = cy + Math.sin(a1)*r;
+        const c = S.bar_gradient ? lerp(lc, rc, i/segments) : lc;
+        ctx.strokeStyle = rgba(c, 0.8);
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+}
+
+function drawEqualizer(ctx, w, h, levels, lc, rc, count) {
+    const gap = 2;
+    let bw = (w - gap*(count-1))/count;
+    if (bw < 2) bw = 2;
+    for (let i = 0; i < count; i++) {
+        const lv = levels[i] || 0.05;
+        const totalH = Math.max(4, lv * h);
+        const segH = 3, segGap = 1;
+        const segs = Math.max(1, Math.floor(totalH / (segH + segGap)));
+        const x = i * (bw + gap);
+        for (let s = 0; s < segs; s++) {
+            const y = h - (s+1)*(segH+segGap);
+            const t = s / Math.max(1, segs-1);
+            const c = S.bar_gradient ? lerp(lc, rc, t) : lc;
+            ctx.fillStyle = rgba(c, 0.6 + t * 0.4);
+            ctx.fillRect(x, y, bw, segH);
+        }
+    }
+}
+
+// ============================================================
+//  ANIMATION HELPERS
+// ============================================================
+function easeInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
+
+function easeOutBounce(t) {
+    if (t < 1/2.75) { return 7.5625*t*t; }
+    else if (t < 2/2.75) { return 7.5625*(t-=1.5/2.75)*t+.75; }
+    else if (t < 2.5/2.75) { return 7.5625*(t-=2.25/2.75)*t+.9375; }
+    else { return 7.5625*(t-=2.625/2.75)*t+.984375; }
+}
+
+function easeOutBack(t) {
+    var c1 = 1.70158;
+    var c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+function animateValue(from, to, duration, onUpdate, onDone, easingFn) {
+    var ef = easingFn || easeInOutCubic;
+    const start = performance.now();
+    function tick(now) {
+        let t = Math.min(1, (now - start) / duration);
+        let et = ef(t);
+        onUpdate(from + (to - from) * et, t);
+        if (t < 1) requestAnimationFrame(tick);
+        else if (onDone) onDone();
+    }
+    requestAnimationFrame(tick);
+}
+
+// Multi-property animation helper
+function animateMulti(props, duration, onDone, easingFn) {
+    var ef = easingFn || easeInOutCubic;
+    var start = performance.now();
+    function tick(now) {
+        var t = Math.min(1, (now - start) / duration);
+        var et = ef(t);
+        var vals = {};
+        for (var k in props) {
+            vals[k] = props[k].from + (props[k].to - props[k].from) * et;
+        }
+        for (var k in props) {
+            if (props[k].update) props[k].update(vals[k], t);
+        }
+        if (t < 1) requestAnimationFrame(tick);
+        else if (onDone) onDone();
+    }
+    requestAnimationFrame(tick);
+}
+
+// ============================================================
+//  RECORDING LOGIC
+// ============================================================
+function toggleRecording() {
+    if (state === 'idle') startRecording();
+    else if (state === 'recording') stopRecording();
+}
+
+function startRecording() {
+    if (state !== 'idle') return;
+    state = 'recording';
+    playSound('sound_start');
+    updateInfoPanel();
+    setPhase('Recording');
+    micBtn.classList.add('recording');
+
+    applyPillStyle();
+    buildVizCanvas();
+    pill.style.display = '';
+    pill.classList.add('visible');
+
+    var anim = S.pill_animation || 'smooth';
+
+    if (anim === 'smooth') {
+        // Scale-up from 0.85 to 1.0 + fade-in
+        pill.style.opacity = '0';
+        pill.style.transform = 'scale(0.85)';
+        animateValue(0, 1, 300, function(v) {
+            pill.style.opacity = v;
+            pill.style.transform = 'scale(' + (0.85 + 0.15 * v) + ')';
+        }, function() {
+            pill.style.transform = '';
+        });
+    } else if (anim === 'bounce') {
+        // Snap in from below - very fast, punchy bounce
+        var targetPos = getPillPosition();
+        pill.style.opacity = '1';
+        pill.style.top = (targetPos.y + 100) + 'px';
+        pill.style.transform = 'scale(0.9)';
+        var startY = targetPos.y + 100;
+        var endY = targetPos.y;
+        var bounceStart = performance.now();
+        var bounceDur = 350;
+        function bounceTick(now) {
+            var t = Math.min(1, (now - bounceStart) / bounceDur);
+            var cy, sc;
+            if (t < 0.4) {
+                // FAST snap to overshoot (18px above target) + scale up
+                var s = t / 0.4;
+                var e = 1 - Math.pow(1 - s, 3); // easeOutCubic
+                cy = startY + ((endY - 18) - startY) * e;
+                sc = 0.9 + 0.15 * e; // 0.9 -> 1.05
+            } else if (t < 0.65) {
+                // Bounce down past target
+                var s = (t - 0.4) / 0.25;
+                cy = (endY - 18) + (18 + 6) * s;
+                sc = 1.05 - 0.05 * s; // 1.05 -> 1.0
+            } else if (t < 0.85) {
+                // Small up-bounce
+                var s = (t - 0.65) / 0.2;
+                cy = (endY + 6) - (6 + 3) * s;
+                sc = 1.0 + 0.02 * Math.sin(s * Math.PI);
+            } else {
+                // Settle
+                var s = (t - 0.85) / 0.15;
+                cy = (endY - 3) + 3 * s;
+                sc = 1.0;
+            }
+            pill.style.top = cy + 'px';
+            pill.style.transform = 'scale(' + sc + ')';
+            if (t < 1) requestAnimationFrame(bounceTick);
+            else {
+                pill.style.top = endY + 'px';
+                pill.style.transform = '';
+            }
+        }
+        requestAnimationFrame(bounceTick);
+    } else {
+        // Minimal: simple fade-in, no scale, no movement
+        pill.style.opacity = '0';
+        pill.style.transform = '';
+        animateValue(0, 1, 300, function(v) {
+            pill.style.opacity = v;
+        });
+    }
+
+    prevLevels = [];
+    startVizAnimation();
+}
+
+function startVizAnimation() {
+    if (vizAnimId) cancelAnimationFrame(vizAnimId);
+    let lastTime = 0;
+    function tick(now) {
+        if (state !== 'recording') return;
+        if (now - lastTime > 60) {
+            lastTime = now;
+            vizPhase += 0.1;
+            const count = S.bar_count;
+            let levels = Array.from({length: count}, function() { return 0.1 + Math.random() * 0.8; });
+            if (prevLevels.length === count) {
+                for (let i = 0; i < count; i++) levels[i] = prevLevels[i] * 0.3 + levels[i] * 0.7;
+            }
+            prevLevels = levels.slice();
+            drawVisualization(levels);
+        }
+        vizAnimId = requestAnimationFrame(tick);
+    }
+    vizAnimId = requestAnimationFrame(tick);
+}
+
+// ============================================================
+//  STOP RECORDING - ANIMATION DISPATCHER
+// ============================================================
+function stopRecording() {
+    if (state !== 'recording') return;
+    state = 'processing';
+    playSound('sound_stop');
+    updateInfoPanel();
+    micBtn.classList.remove('recording');
+    if (vizAnimId) { cancelAnimationFrame(vizAnimId); vizAnimId = null; }
+
+    var anim = S.pill_animation || 'smooth';
+    if (anim === 'smooth') {
+        stopRecordingSmooth();
+    } else if (anim === 'bounce') {
+        stopRecordingBounce();
+    } else {
+        stopRecordingMinimal();
+    }
+}
+
+function resetPillFully() {
+    pill.style.display = 'none';
+    pill.classList.remove('visible');
+    pill.style.opacity = '';
+    pill.style.transform = '';
+    pillCheckmark.style.display = 'none';
+    pillCheckmark.style.transform = '';
+    pillSpinner.style.display = 'none';
+    pillIcon.style.display = '';
+    pillIcon.style.opacity = '1';
+    pillViz.style.display = '';
+    pillViz.style.opacity = '1';
+    micBtn.classList.remove('recording');
+    micBtn.querySelector('svg').innerHTML = '<path d="' + MIC_ICON_PATH + '"/>';
+    state = 'idle';
+    setPhase('Idle');
+    updateInfoPanel();
+}
+
+// ============================================================
+//  SMOOTH ANIMATION
+// ============================================================
+// --- Shared helpers for all animations ---
+
+function prepareSpinner(circleSize) {
+    var spinColor = S.spinner_color || S.processing_color || '#ffa726';
+    var spinSize = Math.max(16, circleSize - 12);
+    pillSpinner.style.display = 'flex';
+    pillSpinner.style.opacity = '0';
+    pillSpinner.style.transform = '';
+    pillSpinner.querySelector('svg').style.width = spinSize + 'px';
+    pillSpinner.querySelector('svg').style.height = spinSize + 'px';
+    pillSpinner.querySelector('svg').style.stroke = spinColor;
+}
+
+function prepareCheckmark(circleSize) {
+    var checkSize = Math.max(16, circleSize - 12);
+    var checkColor = S.checkmark_color || '#66bb6a';
+    pillCheckmark.style.display = 'flex';
+    pillCheckmark.style.opacity = '0';
+    pillCheckmark.style.transform = '';
+    var checkSvg = pillCheckmark.querySelector('svg');
+    checkSvg.style.width = checkSize + 'px';
+    checkSvg.style.height = checkSize + 'px';
+    checkSvg.setAttribute('stroke', checkColor);
+    var checkShape = checkSvg.querySelector('polyline') || checkSvg.querySelector('path');
+    if (checkShape) checkShape.setAttribute('stroke', checkColor);
+}
+
+function showCheckmarkThenFadeOut(circleSize, style) {
+    setPhase('Checkmark');
+    prepareCheckmark(circleSize);
+
+    // Crossfade: spinner out, checkmark in (in-place, no translation/slide)
+    var useZoom = S.checkmark_effect === 'zoom';
+    if (useZoom) pillCheckmark.style.transform = 'scale(0)';
+    var crossStart = performance.now();
+    var crossDur = 300;
+    function crossTick(now) {
+        var t = Math.min(1, (now - crossStart) / crossDur);
+        var et = easeInOutCubic(t);
+        pillSpinner.style.opacity = (1 - et);
+        pillCheckmark.style.opacity = et;
+        if (useZoom) {
+            pillCheckmark.style.transform = 'scale(' + et + ')';
+        }
+        if (t < 1) requestAnimationFrame(crossTick);
+        else {
+            pillSpinner.style.display = 'none';
+            if (useZoom) pillCheckmark.style.transform = 'scale(1)';
+        }
+    }
+    requestAnimationFrame(crossTick);
+
+    playSound('sound_finish');
+
+    // Visible 800ms, then exit animation
+    setTimeout(function() {
+        setPhase('Fade Out');
+        state = 'done';
+        if (style === 'smooth') {
+            // Scale down + fade
+            animateValue(1, 0, 450, function(v) {
+                pill.style.opacity = v;
+                pill.style.transform = 'scale(' + (0.85 + 0.15 * v) + ')';
+            }, function() { resetPillFully(); });
+        } else if (style === 'bounce') {
+            // Bounce down + fade
+            var startTop = parseFloat(pill.style.top);
+            animateValue(0, 1, 500, function(v) {
+                pill.style.top = (startTop + 60 * v) + 'px';
+                pill.style.opacity = (1 - v);
+            }, function() { resetPillFully(); }, easeInOutCubic);
+        } else {
+            // Minimal: simple fade
+            animateValue(1, 0, 400, function(v) {
+                pill.style.opacity = v;
+            }, function() { resetPillFully(); });
+        }
+    }, 800);
+}
+
+// ============================================================
+//  SMOOTH ANIMATION
+// ============================================================
+function stopRecordingSmooth() {
+    var circleSize = S.processing_size || 44;
+
+    // Prepare spinner early
+    prepareSpinner(circleSize);
+
+    // Phase 1+2 combined: Fade icon/viz via pure opacity while simultaneously
+    // morphing pill shape and sliding. Icon/viz fade faster (first 40% of morph).
+    setPhase('Morph + Slide');
+    pillIcon.style.transition = 'none';
+    pillViz.style.transition = 'none';
+
+    var startX = parseFloat(pill.style.left);
+    var startY = parseFloat(pill.style.top);
+    var startW = S.pill_width;
+    var startH = S.pill_height;
+    var startBR = S.pill_border_radius;
+    var endPos = getProcessingPosition();
+    var endBR = circleSize / 2;
+
+    var morphStart = performance.now();
+    var morphDur = 700;
+
+    function morphTick(now) {
+        var t = Math.min(1, (now - morphStart) / morphDur);
+        var et = easeInOutCubic(t);
+
+        // Position + size morph
+        pill.style.left = (startX + (endPos.x - startX) * et) + 'px';
+        pill.style.top = (startY + (endPos.y - startY) * et) + 'px';
+        var cw = startW + (circleSize - startW) * et;
+        var ch = startH + (circleSize - startH) * et;
+        pill.style.width = cw + 'px';
+        pill.style.height = ch + 'px';
+        pillInner.style.width = cw + 'px';
+        pillInner.style.height = ch + 'px';
+        pillInner.style.borderRadius = (startBR + (endBR - startBR) * et) + 'px';
+        pillInner.style.padding = '0';
+
+        // Icon+Viz: pure opacity fade in first 35% of morph (no movement, no clip issues)
+        var iconOpacity = Math.max(0, 1 - t / 0.35);
+        pillIcon.style.opacity = iconOpacity;
+        pillViz.style.opacity = iconOpacity;
+        if (t >= 0.35 && pillIcon.style.display !== 'none') {
+            pillIcon.style.display = 'none';
+            pillViz.style.display = 'none';
+        }
+
+        // Spinner fades in from 25% to 60% of morph
+        var spinOpacity = Math.max(0, Math.min(1, (t - 0.25) / 0.35));
+        pillSpinner.style.opacity = spinOpacity;
+
+        if (t < 1) {
+            requestAnimationFrame(morphTick);
+        }
+    }
+    requestAnimationFrame(morphTick);
+
+    // After morph + 3s processing, show checkmark
+    setTimeout(function() {
+        showCheckmarkThenFadeOut(circleSize, 'smooth');
+    }, morphDur + 3000);
+}
+
+// ============================================================
+//  BOUNCE ANIMATION
+// ============================================================
+function stopRecordingBounce() {
+    var circleSize = S.processing_size || 44;
+    prepareSpinner(circleSize);
+    setPhase('Bounce Morph');
+    pillIcon.style.transition = 'none';
+    pillViz.style.transition = 'none';
+
+    var startX = parseFloat(pill.style.left);
+    var startY = parseFloat(pill.style.top);
+    var startW = S.pill_width;
+    var startH = S.pill_height;
+    var startBR = S.pill_border_radius;
+    var endPos = getProcessingPosition();
+    var endBR = circleSize / 2;
+
+    // Clamp end position to never exceed screen bounds
+    var maxX = window.innerWidth - circleSize - 8;
+    var maxY = window.innerHeight - circleSize - 8;
+    endPos.x = Math.min(endPos.x, maxX);
+    endPos.y = Math.min(endPos.y, maxY);
+
+    var morphStart = performance.now();
+    var totalDur = 650; // Single unified animation
+
+    // Size morph: fast front-loaded (pill becomes circle in first 30%)
+    function sizeEase(t) {
+        // Aggressive easeOutQuint - reaches ~95% by t=0.3
+        var s = Math.min(1, t / 0.35);
+        return 1 - Math.pow(1 - s, 5);
+    }
+
+    // Position: fast arrival with tiny settle wobble (NEVER exceeds 1.0)
+    function posEase(t) {
+        // easeOutQuart for position - no overshoot at all
+        return 1 - Math.pow(1 - t, 4);
+    }
+
+    function tick(now) {
+        var t = Math.min(1, (now - morphStart) / totalDur);
+
+        // --- Size morph (front-loaded, circle by ~30%) ---
+        var st = sizeEase(t);
+        var cw = startW + (circleSize - startW) * st;
+        var ch = startH + (circleSize - startH) * st;
+        var cbr = startBR + (endBR - startBR) * st;
+        pill.style.width = cw + 'px';
+        pill.style.height = ch + 'px';
+        pillInner.style.width = cw + 'px';
+        pillInner.style.height = ch + 'px';
+        pillInner.style.borderRadius = cbr + 'px';
+        pillInner.style.padding = '0';
+
+        // --- Position slide (smooth, no overshoot) ---
+        var pt = posEase(t);
+        pill.style.left = (startX + (endPos.x - startX) * pt) + 'px';
+        pill.style.top = (startY + (endPos.y - startY) * pt) + 'px';
+
+        // --- Subtle scale bounce on the whole pill (gives it life) ---
+        var scaleBounce = 1;
+        if (t > 0.7) {
+            var bt = (t - 0.7) / 0.3;
+            scaleBounce = 1 + 0.04 * Math.sin(bt * Math.PI * 2) * (1 - bt);
+        }
+        pill.style.transform = 'scale(' + scaleBounce + ')';
+
+        // --- Content: icon/viz fade out in first 25% ---
+        var iconOp = Math.max(0, 1 - t / 0.25);
+        pillIcon.style.opacity = iconOp;
+        pillViz.style.opacity = iconOp;
+        if (t >= 0.25 && pillIcon.style.display !== 'none') {
+            pillIcon.style.display = 'none';
+            pillViz.style.display = 'none';
+        }
+
+        // --- Spinner fades in from 15% to 50% ---
+        var spinOp = Math.max(0, Math.min(1, (t - 0.15) / 0.35));
+        pillSpinner.style.opacity = spinOp;
+
+        if (t < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            pill.style.transform = '';
+            pill.style.left = endPos.x + 'px';
+            pill.style.top = endPos.y + 'px';
+            pill.style.width = circleSize + 'px';
+            pill.style.height = circleSize + 'px';
+            pillInner.style.width = circleSize + 'px';
+            pillInner.style.height = circleSize + 'px';
+        }
+    }
+    requestAnimationFrame(tick);
+
+    setTimeout(function() {
+        showCheckmarkThenFadeOut(circleSize, 'bounce');
+    }, totalDur + 3000);
+}
+
+// ============================================================
+//  MINIMAL ANIMATION
+// ============================================================
+function stopRecordingMinimal() {
+    setPhase('Crossfade to Spinner');
+    var circleSize = S.processing_size || 44;
+    var endBR = circleSize / 2;
+    var startW = S.pill_width;
+    var startBR = S.pill_border_radius;
+
+    // Prepare spinner early
+    prepareSpinner(circleSize);
+
+    // Store original center
+    var origCenterX = parseFloat(pill.style.left) + startW / 2;
+
+    // Crossfade icon+viz out while morphing to circle IN PLACE + spinner fades in
+    var crossStart = performance.now();
+    var crossDur = 500;
+
+    function crossTick(now) {
+        var t = Math.min(1, (now - crossStart) / crossDur);
+        var et = easeInOutCubic(t);
+
+        pillIcon.style.opacity = (1 - et);
+        pillViz.style.opacity = (1 - et);
+
+        var curW = startW + (circleSize - startW) * et;
+        var curBR = startBR + (endBR - startBR) * et;
+        var newLeft = origCenterX - curW / 2;
+
+        pill.style.left = newLeft + 'px';
+        pill.style.width = curW + 'px';
+        pill.style.height = circleSize + 'px';
+        pillInner.style.width = curW + 'px';
+        pillInner.style.height = circleSize + 'px';
+        pillInner.style.borderRadius = curBR + 'px';
+        pillInner.style.padding = '0';
+
+        // Spinner fades in during morph
+        var spinOpacity = Math.max(0, Math.min(1, (t - 0.4) / 0.5));
+        pillSpinner.style.opacity = spinOpacity;
+
+        if (t < 1) {
+            requestAnimationFrame(crossTick);
+        } else {
+            pillIcon.style.display = 'none';
+            pillViz.style.display = 'none';
+        }
+    }
+    requestAnimationFrame(crossTick);
+
+    // After crossfade + 3s processing, show checkmark
+    setTimeout(function() {
+        showCheckmarkThenFadeOut(circleSize, 'minimal');
+    }, 500 + 3000);
+}
+
+// ============================================================
+//  INFO PANEL
+// ============================================================
+function setPhase(p) { document.getElementById('info-phase').textContent = p; }
+function updateInfoPanel() {
+    var labels = { idle: 'Bereit', recording: 'Aufnahme...', processing: 'Verarbeitung...', done: 'Fertig' };
+    document.getElementById('info-status').textContent = labels[state] || state;
+}
+
+// ============================================================
+//  SETTINGS WINDOW
+// ============================================================
+function openSettings() {
+    settingsOpen = true;
+    document.getElementById('settings-overlay').classList.add('visible');
+    buildSettingsUI();
+}
+function closeSettings() {
+    settingsOpen = false;
+    document.getElementById('settings-overlay').classList.remove('visible');
+}
+document.getElementById('settings-close').onclick = closeSettings;
+document.getElementById('settings-overlay').addEventListener('mousedown', function(e) {
+    if (e.target === document.getElementById('settings-overlay')) closeSettings();
+});
+
+// Tab switching
+document.querySelectorAll('.settings-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.settings-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        document.querySelectorAll('.settings-page').forEach(function(p) { p.classList.remove('active'); });
+        var page = document.getElementById('page-' + tab.dataset.tab);
+        if (page) page.classList.add('active');
+    });
+});
+
+function buildSettingsUI() {
+    var body = document.getElementById('settings-body');
+    body.innerHTML = '';
+
+    // ---- Page 1: Aufnahme-Pill ----
+    var pagePill = el('div', {class:'settings-page active', id:'page-pill'});
+
+    // Form & Position
+    var pillGrp = settingsGroup('Form & Position', 'Groesse und Position der Aufnahme-Anzeige');
+    pillGrp.appendChild(spinRow('Breite', 'Pixel', 'pill_width', 100, 600, 10));
+    pillGrp.appendChild(spinRow('Hoehe', 'Pixel', 'pill_height', 24, 80, 2));
+    pillGrp.appendChild(spinRow('Eckenradius', 'Pixel', 'pill_border_radius', 0, 40, 1));
+    pillGrp.appendChild(spinRow('Abstand oben/unten', 'Pixel vom Bildschirmrand', 'pill_margin_top', 0, 200, 5));
+    pillGrp.appendChild(spinRow('Abstand horizontal', 'Pixel', 'pill_margin_horizontal', 0, 200, 5));
+    pillGrp.appendChild(selectRow('Position', 'Wo die Pill angezeigt wird', 'pill_position',
+        POSITIONS.map(function(p) { return {value: p.id, label: p.name}; })));
+    pagePill.appendChild(pillGrp);
+
+    // Aussehen
+    var colorGrp = settingsGroup('Aussehen', 'Hintergrund, Border, Schatten');
+    colorGrp.appendChild(colorRowAlpha('Hintergrundfarbe', 'Pill-Hintergrund', 'pill_bg_color'));
+    colorGrp.appendChild(colorRow('Border-Farbe', 'Umrandung', 'pill_border_color'));
+    colorGrp.appendChild(spinRow('Border-Staerke', 'Pixel', 'pill_border_width', 0, 5, 1));
+    colorGrp.appendChild(spinRow('Blur-Staerke', 'Pixel (Backdrop-Filter)', 'pill_blur', 0, 40, 1));
+    colorGrp.appendChild(rangeRow('Schatten-Intensitaet', '0 = kein Schatten', 'pill_shadow_intensity', 0, 1, 0.05));
+    pagePill.appendChild(colorGrp);
+
+    // Mikrofon-Icon
+    var iconGrp = settingsGroup('Mikrofon-Icon', 'Icon in der Pill anpassen');
+    iconGrp.appendChild(selectRow('Icon', 'Vordefiniertes Icon waehlen', 'icon_name',
+        ICON_OPTIONS.map(function(o) { return {value: o.id, label: o.name}; })));
+    iconGrp.appendChild(colorRow('Icon-Farbe', 'Farbe des Icons in der Pill', 'icon_color'));
+    iconGrp.appendChild(colorRow('Aufnahme-Farbe', 'Icon-Farbe waehrend Aufnahme', 'recording_color'));
+    pagePill.appendChild(iconGrp);
+
+    body.appendChild(pagePill);
+
+    // ---- Page 2: Visualisierung ----
+    var pageViz = el('div', {class:'settings-page', id:'page-visualization'});
+
+    // Audio-Visualisierung
+    var vizGrp = settingsGroup('Audio-Visualisierung', 'Wie die Spracheingabe dargestellt wird');
+    vizGrp.appendChild(selectRow('Visualisierungstyp', 'Art der Audio-Anzeige', 'visualization_type',
+        VISUALIZATION_TYPES.map(function(v) { return {value: v.id, label: v.name}; })));
+    vizGrp.appendChild(spinRow('Anzahl Balken', 'Nur fuer Balken/Equalizer (3-30)', 'bar_count', 3, 30, 1));
+    vizGrp.appendChild(switchRow('Farbverlauf', 'Gradient von links nach rechts', 'bar_gradient'));
+    vizGrp.appendChild(colorRow('Farbe Links', 'Startfarbe des Verlaufs', 'bar_color_left'));
+    vizGrp.appendChild(colorRow('Farbe Rechts', 'Endfarbe des Verlaufs', 'bar_color_right'));
+    pageViz.appendChild(vizGrp);
+
+    // Status-Anzeige (Processing)
+    var statusGrp = settingsGroup('Status-Anzeige (Processing)', 'Position und Aussehen des Processing-Kreises');
+    statusGrp.appendChild(selectRow('Processing-Position', 'Wo der Processing-Kreis angezeigt wird', 'processing_position',
+        POSITIONS.map(function(p) { return {value: p.id, label: p.name}; })));
+    statusGrp.appendChild(spinRow('Abstand unten', 'Pixel vom unteren Rand', 'processing_margin_bottom', 0, 200, 5));
+    statusGrp.appendChild(spinRow('Abstand horizontal', 'Pixel vom seitlichen Rand', 'processing_margin_horizontal', 0, 200, 5));
+    statusGrp.appendChild(spinRow('Groesse', 'Durchmesser des Processing-Kreises', 'processing_size', 24, 80, 2));
+    statusGrp.appendChild(colorRow('Verarbeitungs-Farbe', 'Hintergrund des Processing-Kreises', 'processing_color'));
+    statusGrp.appendChild(colorRow('Spinner-Farbe', 'Farbe des drehenden Lade-Spinners', 'spinner_color'));
+    statusGrp.appendChild(colorRow('Haekchen-Farbe', 'Farbe des Fertig-Haekchens', 'checkmark_color'));
+    pageViz.appendChild(statusGrp);
+
+    // Animation
+    var animGrp = settingsGroup('Animation', 'Animations-Stil fuer die Aufnahme-Pill');
+    animGrp.appendChild(selectRow('Animations-Stil', 'Art der Ein-/Ausblend-Animation', 'pill_animation',
+        ANIMATION_STYLES.map(function(a) { return {value: a.id, label: a.name}; })));
+    animGrp.appendChild(selectRow('Haekchen-Effekt', 'Wie das Fertig-Haekchen erscheint', 'checkmark_effect',
+        [{value: 'fade', label: 'Fade'}, {value: 'zoom', label: 'Zoom'}]));
+    pageViz.appendChild(animGrp);
+
+    body.appendChild(pageViz);
+
+    // ---- Page 3: Sound & Benachrichtigungen ----
+    var pageSnd = el('div', {class:'settings-page', id:'page-sound'});
+
+    // Feedback-Toene toggle
+    var sndEnableGrp = settingsGroup('Feedback-Toene', 'Akustisches Feedback aktivieren/deaktivieren');
+    sndEnableGrp.appendChild(switchRow('Toene aktiviert', 'Akustisches Feedback bei Aufnahme-Start und -Stop', 'sound_enabled'));
+    pageSnd.appendChild(sndEnableGrp);
+
+    // Start-Ton
+    var startSndGrp = settingsGroup('Start-Ton', 'Ton bei Aufnahme-Start');
+    startSndGrp.appendChild(soundRow('Start-Ton', 'Ton bei Aufnahme-Start', 'sound_start'));
+    startSndGrp.appendChild(rangeRow('Lautstaerke', '0 = stumm, 1 = voll', 'sound_start_volume', 0, 1, 0.05));
+    pageSnd.appendChild(startSndGrp);
+
+    // Stop-Ton
+    var stopSndGrp = settingsGroup('Stop-Ton', 'Ton bei Aufnahme-Stop');
+    stopSndGrp.appendChild(soundRow('Stop-Ton', 'Ton bei Aufnahme-Stop', 'sound_stop'));
+    stopSndGrp.appendChild(rangeRow('Lautstaerke', '0 = stumm, 1 = voll', 'sound_stop_volume', 0, 1, 0.05));
+    pageSnd.appendChild(stopSndGrp);
+
+    // Fertig-Ton
+    var finishSndGrp = settingsGroup('Fertig-Ton', 'Ton wenn Transkription abgeschlossen');
+    finishSndGrp.appendChild(soundRow('Fertig-Ton', 'Ton wenn Transkription abgeschlossen', 'sound_finish'));
+    finishSndGrp.appendChild(rangeRow('Lautstaerke', '0 = stumm, 1 = voll', 'sound_finish_volume', 0, 1, 0.05));
+    pageSnd.appendChild(finishSndGrp);
+
+    // Benachrichtigungen
+    var notifGrp = settingsGroup('Benachrichtigungen', 'GNOME-System-Benachrichtigungen');
+    notifGrp.appendChild(switchRow('GNOME-Benachrichtigungen', 'System-Benachrichtigungen anzeigen (standardmaessig deaktiviert)', 'notifications_enabled'));
+    pageSnd.appendChild(notifGrp);
+
+    body.appendChild(pageSnd);
+
+    // ---- Page 4: Theme & Daten ----
+    var pageData = el('div', {class:'settings-page', id:'page-data'});
+
+    // Theme group
+    var themeGrp = settingsGroup('Theme', 'Vorkonfigurierte Themes oder System-Theme folgen');
+    themeGrp.appendChild(switchRow('System-Theme folgen', 'Passt sich automatisch an das GTK-Theme an', 'follow_system_theme'));
+    themeGrp.appendChild(selectRow('Theme-Preset', 'Vorkonfiguriertes Farbschema', 'active_theme',
+        Object.entries(THEME_PRESETS).map(function(e) { return {value: e[0], label: e[1].name}; }),
+        function(val) {
+            S.active_theme = val;
+            var preset = THEME_PRESETS[val];
+            if (preset) {
+                Object.entries(preset).forEach(function(e) {
+                    if (e[0] !== 'name' && e[0] in S) S[e[0]] = e[1];
+                });
+            }
+            buildSettingsUI();
+        }
+    ));
+    pageData.appendChild(themeGrp);
+
+    // Einstellungen Export/Import
+    var settingsDataGrp = settingsGroup('Einstellungen', 'Alle Einstellungen exportieren oder importieren');
+    settingsDataGrp.appendChild(buttonRow('Einstellungen exportieren', 'Als JSON-Datei speichern', 'Exportieren', true, exportSettings));
+    settingsDataGrp.appendChild(buttonRow('Einstellungen importieren', 'Aus JSON-Datei laden', 'Importieren', false, importSettings));
+    pageData.appendChild(settingsDataGrp);
+
+    // Themes Export/Import
+    var themeDataGrp = settingsGroup('Themes', 'Eigene Themes exportieren, importieren oder teilen');
+    themeDataGrp.appendChild(buttonRow('Aktuelles Theme exportieren', 'Nur die Theme-relevanten Einstellungen', 'Exportieren', true, exportTheme));
+    themeDataGrp.appendChild(buttonRow('Theme importieren', 'Theme-Datei laden und speichern', 'Importieren', false, importTheme));
+    pageData.appendChild(themeDataGrp);
+
+    body.appendChild(pageData);
+
+    // Activate correct tab page
+    var activeTab = document.querySelector('.settings-tab.active');
+    if (activeTab) {
+        document.querySelectorAll('.settings-page').forEach(function(p) { p.classList.remove('active'); });
+        var pg = document.getElementById('page-' + activeTab.dataset.tab);
+        if (pg) pg.classList.add('active');
+    }
+}
+
+// ============================================================
+//  SETTINGS UI HELPERS
+// ============================================================
+function el(tag, attrs) {
+    var e = document.createElement(tag);
+    if (attrs) {
+        Object.keys(attrs).forEach(function(k) {
+            if (k === 'class') e.className = attrs[k];
+            else e.setAttribute(k, attrs[k]);
+        });
+    }
+    for (var i = 2; i < arguments.length; i++) {
+        var c = arguments[i];
+        if (typeof c === 'string') e.textContent = c;
+        else if (c) e.appendChild(c);
+    }
+    return e;
+}
+
+function settingsGroup(title, desc) {
+    var g = el('div', {class:'settings-group'});
+    g.appendChild(el('h3', {}, title));
+    if (desc) g.appendChild(el('div', {class:'group-desc'}, desc));
+    return g;
+}
+
+function makeRow(title, subtitle) {
+    var row = el('div', {class:'setting-row'});
+    var label = el('div', {class:'setting-label'});
+    var titleEl = el('div', {class:'title'});
+    titleEl.textContent = title;
+    label.appendChild(titleEl);
+    if (subtitle) {
+        var subEl = el('div', {class:'subtitle'});
+        subEl.textContent = subtitle;
+        label.appendChild(subEl);
+    }
+    row.appendChild(label);
+    var ctrl = el('div', {class:'setting-control'});
+    row.appendChild(ctrl);
+    return { row: row, ctrl: ctrl };
+}
+
+function switchRow(title, subtitle, key) {
+    var m = makeRow(title, subtitle);
+    var toggle = el('div', {class: 'toggle-switch' + (S[key] ? ' on' : '')});
+    toggle.onclick = function() { S[key] = !S[key]; toggle.classList.toggle('on', S[key]); };
+    m.ctrl.appendChild(toggle);
+    return m.row;
+}
+
+function spinRow(title, subtitle, key, min, max, step) {
+    var m = makeRow(title, subtitle);
+    var input = el('input', {class:'s-number', type:'number', min:String(min), max:String(max), step:String(step), value:String(S[key])});
+    input.addEventListener('input', function() {
+        var v = parseFloat(input.value);
+        if (!isNaN(v)) { v = Math.max(min, Math.min(max, v)); S[key] = v; }
+    });
+    m.ctrl.appendChild(input);
+    return m.row;
+}
+
+function rangeRow(title, subtitle, key, min, max, step) {
+    var m = makeRow(title, subtitle);
+    var valSpan = document.createElement('span');
+    valSpan.textContent = String(S[key]);
+    valSpan.style.cssText = 'font-size:12px;opacity:0.7;min-width:30px;text-align:right';
+    var input = el('input', {class:'s-range', type:'range', min:String(min), max:String(max), step:String(step), value:String(S[key])});
+    input.addEventListener('input', function() {
+        S[key] = parseFloat(input.value);
+        valSpan.textContent = S[key].toFixed(2);
+    });
+    m.ctrl.appendChild(input);
+    m.ctrl.appendChild(valSpan);
+    return m.row;
+}
+
+function selectRow(title, subtitle, key, options, onChange) {
+    var m = makeRow(title, subtitle);
+    var sel = el('select', {class:'s-select'});
+    options.forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        if (o.value === S[key]) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function() {
+        S[key] = sel.value;
+        if (onChange) onChange(sel.value);
+    });
+    m.ctrl.appendChild(sel);
+    return m.row;
+}
+
+function colorRow(title, subtitle, key) {
+    var m = makeRow(title, subtitle);
+    var hex = toHex(S[key]);
+    var input = el('input', {class:'s-color', type:'color', value: hex});
+    input.addEventListener('input', function() { S[key] = input.value; });
+    m.ctrl.appendChild(input);
+    return m.row;
+}
+
+function colorRowAlpha(title, subtitle, key) {
+    var m = makeRow(title, subtitle);
+    var parsed = parseColor(S[key]);
+    var hex = rgbToHex(parsed.r, parsed.g, parsed.b);
+    var alpha = parsed.a;
+
+    var colorInput = el('input', {class:'s-color', type:'color', value: hex});
+    var alphaInput = el('input', {class:'s-alpha-slider', type:'range', min:'0', max:'1', step:'0.01', value:String(alpha)});
+    var alphaLabel = document.createElement('span');
+    alphaLabel.textContent = (alpha * 100).toFixed(0) + '%';
+    alphaLabel.style.cssText = 'font-size:11px;opacity:0.6;min-width:32px';
+
+    function update() {
+        var c = hexToRgb(colorInput.value);
+        var a = parseFloat(alphaInput.value);
+        S[key] = 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a.toFixed(2) + ')';
+        alphaLabel.textContent = (a * 100).toFixed(0) + '%';
+    }
+    colorInput.addEventListener('input', update);
+    alphaInput.addEventListener('input', update);
+
+    m.ctrl.appendChild(colorInput);
+    m.ctrl.appendChild(alphaInput);
+    m.ctrl.appendChild(alphaLabel);
+    return m.row;
+}
+
+function soundRow(title, subtitle, key) {
+    var m = makeRow(title, subtitle);
+    var wrapper = el('div', {class:'sound-row'});
+
+    var soundOptions = [{value:'none', label:'Kein Ton'}];
+    BUILTIN_SOUNDS.forEach(function(s) { soundOptions.push({value: s.id, label: s.name}); });
+    soundOptions.push({value:'custom', label:'Eigene Datei...'});
+
+    var current = S[key];
+    if (current === 'default') current = 'gentle-ping';
+    if (current && current.startsWith('builtin:')) current = current.slice(8);
+
+    var sel = el('select', {class:'s-select'});
+    soundOptions.forEach(function(o) {
+        var opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        if (o.value === current) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function() { S[key] = sel.value; });
+
+    var playBtn = el('button', {class:'play-btn', title:'Vorhoeren'});
+    playBtn.innerHTML = '&#9654;';
+    playBtn.addEventListener('click', function() {
+        var id = sel.value;
+        if (id === 'none' || id === 'custom') return;
+        var volKey = key + '_volume';
+        var vol = S[volKey] !== undefined ? S[volKey] : 0.5;
+        try {
+            var a = new Audio('extension/sounds/' + id + '.wav');
+            a.volume = vol;
+            a.play().catch(function() {});
+        } catch(e) {}
+    });
+
+    wrapper.appendChild(sel);
+    wrapper.appendChild(playBtn);
+    m.ctrl.appendChild(wrapper);
+    return m.row;
+}
+
+function buttonRow(title, subtitle, label, primary, onClick) {
+    var m = makeRow(title, subtitle);
+    var btn = el('button', {class: 's-button' + (primary ? '' : ' secondary')});
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    m.ctrl.appendChild(btn);
+    return m.row;
+}
+
+// ============================================================
+//  COLOR UTILITIES
+// ============================================================
+function toHex(color) {
+    if (!color) return '#ffffff';
+    if (color.startsWith('#')) {
+        var h = color.slice(1);
+        if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+        return '#' + h.slice(0, 6);
+    }
+    var m = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (m) return '#' + [m[1],m[2],m[3]].map(function(x) { return parseInt(x).toString(16).padStart(2,'0'); }).join('');
+    return '#ffffff';
+}
+
+function rgbToHex(r, g, b) {
+    return '#' + [r,g,b].map(function(x) { return Math.round(x*255).toString(16).padStart(2,'0'); }).join('');
+}
+
+function hexToRgb(hex) {
+    var h = hex.slice(1);
+    return {r: parseInt(h.substring(0,2),16), g: parseInt(h.substring(2,4),16), b: parseInt(h.substring(4,6),16)};
+}
+
+// ============================================================
+//  EXPORT / IMPORT
+// ============================================================
+function exportSettings() {
+    var blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'jt-dictate-settings.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function importSettings() {
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.addEventListener('change', function() {
+        var file = input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function() {
+            try {
+                var imported = JSON.parse(reader.result);
+                Object.keys(imported).forEach(function(k) {
+                    if (k in S) S[k] = imported[k];
+                });
+                buildSettingsUI();
+            } catch(e) { console.error('Import failed:', e); }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
+}
+
+function exportTheme() {
+    var themeKeys = ['pill_bg_color','pill_border_color','pill_border_width','pill_blur','pill_shadow_intensity',
+        'bar_color_left','bar_color_right','bar_gradient','icon_color','recording_color','processing_color','spinner_color','checkmark_color'];
+    var data = { name: S.active_theme || 'custom' };
+    themeKeys.forEach(function(k) { data[k] = S[k]; });
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'jt-theme-' + data.name + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function importTheme() {
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.addEventListener('change', function() {
+        var file = input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function() {
+            try {
+                var data = JSON.parse(reader.result);
+                var themeKeys = ['pill_bg_color','pill_border_color','pill_border_width','pill_blur','pill_shadow_intensity',
+                    'bar_color_left','bar_color_right','bar_gradient','icon_color','recording_color','processing_color','spinner_color','checkmark_color'];
+                themeKeys.forEach(function(k) { if (k in data) S[k] = data[k]; });
+                S.active_theme = data.name || 'imported';
+                buildSettingsUI();
+            } catch(e) { console.error('Theme import failed:', e); }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
+}
+</script>
+</body>
+</html>

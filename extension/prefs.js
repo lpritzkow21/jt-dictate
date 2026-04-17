@@ -13,7 +13,7 @@ const CONFIG_DIR = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'jt-dic
 const CONFIG_FILE = GLib.build_filenamev([CONFIG_DIR, 'settings.json']);
 const THEMES_DIR = GLib.build_filenamev([CONFIG_DIR, 'themes']);
 
-// Alle verfügbaren Visualisierungstypen
+// Alle verfuegbaren Visualisierungstypen
 const VISUALIZATION_TYPES = [
     {id: 'bars', name: 'Balken'},
     {id: 'waveform', name: 'Waveform'},
@@ -22,21 +22,42 @@ const VISUALIZATION_TYPES = [
     {id: 'equalizer', name: 'Equalizer'},
 ];
 
+// Built-in Sound-Optionen (WAV-Dateien im sounds/ Ordner)
+const BUILTIN_SOUNDS = [
+    {id: 'gentle-ping', name: 'Gentle Ping'},
+    {id: 'bubble', name: 'Bubble'},
+    {id: 'chime', name: 'Chime'},
+    {id: 'click', name: 'Click'},
+    {id: 'cosmic', name: 'Cosmic'},
+    {id: 'crystal', name: 'Crystal'},
+    {id: 'drop', name: 'Drop'},
+    {id: 'echo', name: 'Echo'},
+    {id: 'fairy', name: 'Fairy'},
+    {id: 'glow', name: 'Glow'},
+    {id: 'harp', name: 'Harp'},
+    {id: 'laser', name: 'Laser'},
+    {id: 'nudge', name: 'Nudge'},
+    {id: 'pluck', name: 'Pluck'},
+    {id: 'whoosh', name: 'Whoosh'},
+];
+
 // Built-in Theme Presets
 const THEME_PRESETS = {
     'default': {
         name: 'Standard',
-        pill_bg_color: 'rgba(0,0,0,0.75)',
-        pill_border_color: 'rgba(255,255,255,0.1)',
+        pill_bg_color: 'rgba(15,15,25,0.82)',
+        pill_border_color: 'rgba(255,255,255,0.12)',
         pill_border_width: 1,
-        pill_blur: 0,
-        pill_shadow_intensity: 0.3,
-        bar_color_left: '#3584e4',
-        bar_color_right: '#e01b24',
+        pill_blur: 12,
+        pill_shadow_intensity: 0.4,
+        bar_color_left: '#6c9ff8',
+        bar_color_right: '#f06292',
         bar_gradient: true,
-        icon_color: '#ffffff',
-        recording_color: '#e01b24',
-        processing_color: '#e5a50a',
+        icon_color: '#e8eaed',
+        recording_color: '#ef5350',
+        processing_color: '#ffa726',
+        spinner_color: '#ffa726',
+        checkmark_color: '#66bb6a',
     },
     'neon': {
         name: 'Neon',
@@ -51,6 +72,8 @@ const THEME_PRESETS = {
         icon_color: '#00ff88',
         recording_color: '#ff0044',
         processing_color: '#ffaa00',
+        spinner_color: '#ffaa00',
+        checkmark_color: '#00ff88',
     },
     'minimal': {
         name: 'Minimal',
@@ -65,6 +88,8 @@ const THEME_PRESETS = {
         icon_color: '#ffffff',
         recording_color: '#e01b24',
         processing_color: '#e5a50a',
+        spinner_color: '#ffffff',
+        checkmark_color: '#ffffff',
     },
     'ocean': {
         name: 'Ocean',
@@ -79,6 +104,8 @@ const THEME_PRESETS = {
         icon_color: '#80deea',
         recording_color: '#ff5252',
         processing_color: '#ffab40',
+        spinner_color: '#ffab40',
+        checkmark_color: '#00bcd4',
     },
     'sunset': {
         name: 'Sunset',
@@ -93,53 +120,135 @@ const THEME_PRESETS = {
         icon_color: '#f7c948',
         recording_color: '#e01b24',
         processing_color: '#ff6b35',
+        spinner_color: '#ff6b35',
+        checkmark_color: '#f7c948',
+    },
+    'aurora': {
+        name: 'Aurora',
+        pill_bg_color: 'rgba(10,8,30,0.88)',
+        pill_border_color: '#7c4dff',
+        pill_border_width: 1,
+        pill_blur: 14,
+        pill_shadow_intensity: 0.5,
+        bar_color_left: '#7c4dff',
+        bar_color_right: '#00e5ff',
+        bar_gradient: true,
+        icon_color: '#b388ff',
+        recording_color: '#ff1744',
+        processing_color: '#ffab00',
+        spinner_color: '#00e5ff',
+        checkmark_color: '#69f0ae',
+    },
+    'cherry': {
+        name: 'Cherry',
+        pill_bg_color: 'rgba(40,5,15,0.85)',
+        pill_border_color: '#e91e63',
+        pill_border_width: 1,
+        pill_blur: 8,
+        pill_shadow_intensity: 0.45,
+        bar_color_left: '#e91e63',
+        bar_color_right: '#ff6090',
+        bar_gradient: true,
+        icon_color: '#fce4ec',
+        recording_color: '#d50000',
+        processing_color: '#ff6d00',
+        spinner_color: '#ff6090',
+        checkmark_color: '#f8bbd0',
+    },
+    'forest': {
+        name: 'Forest',
+        pill_bg_color: 'rgba(5,20,10,0.85)',
+        pill_border_color: '#2e7d32',
+        pill_border_width: 1,
+        pill_blur: 10,
+        pill_shadow_intensity: 0.4,
+        bar_color_left: '#43a047',
+        bar_color_right: '#81c784',
+        bar_gradient: true,
+        icon_color: '#c8e6c9',
+        recording_color: '#ff5252',
+        processing_color: '#ffb74d',
+        spinner_color: '#81c784',
+        checkmark_color: '#a5d6a7',
+    },
+    'midnight': {
+        name: 'Midnight',
+        pill_bg_color: 'rgba(5,5,15,0.9)',
+        pill_border_color: 'rgba(100,120,255,0.2)',
+        pill_border_width: 1,
+        pill_blur: 16,
+        pill_shadow_intensity: 0.5,
+        bar_color_left: '#5c6bc0',
+        bar_color_right: '#7986cb',
+        bar_gradient: true,
+        icon_color: '#9fa8da',
+        recording_color: '#ef5350',
+        processing_color: '#ffd54f',
+        spinner_color: '#7986cb',
+        checkmark_color: '#80cbc4',
+    },
+    'rose': {
+        name: 'Rosé',
+        pill_bg_color: 'rgba(30,15,20,0.82)',
+        pill_border_color: 'rgba(255,150,170,0.2)',
+        pill_border_width: 1,
+        pill_blur: 12,
+        pill_shadow_intensity: 0.35,
+        bar_color_left: '#f48fb1',
+        bar_color_right: '#ce93d8',
+        bar_gradient: true,
+        icon_color: '#f8bbd0',
+        recording_color: '#e53935',
+        processing_color: '#ffb74d',
+        spinner_color: '#ce93d8',
+        checkmark_color: '#a5d6a7',
     },
 };
 
 const DEFAULT_SETTINGS = {
-    // Bestehende Settings
     auto_clipboard: true,
     model: 'base',
     language: null,
-
-    // Pill Styling
     pill_width: 200,
     pill_height: 40,
     pill_border_radius: 20,
-    pill_bg_color: 'rgba(0,0,0,0.75)',
-    pill_border_color: 'rgba(255,255,255,0.1)',
+    pill_bg_color: 'rgba(15,15,25,0.82)',
+    pill_border_color: 'rgba(255,255,255,0.12)',
     pill_border_width: 1,
-    pill_blur: 0,
-    pill_shadow_intensity: 0.3,
+    pill_blur: 12,
+    pill_shadow_intensity: 0.4,
     pill_margin_top: 60,
     pill_margin_horizontal: 0,
-    pill_position: 'top-center',
-
-    // Balken/Visualisierung
+    pill_position: 'bottom-center',
     visualization_type: 'bars',
-    bar_color_left: '#3584e4',
-    bar_color_right: '#e01b24',
+    bar_color_left: '#6c9ff8',
+    bar_color_right: '#f06292',
     bar_gradient: true,
-    bar_count: 5,
-
-    // Icon
+    bar_count: 15,
     icon_name: 'audio-input-microphone-symbolic',
-    icon_color: '#ffffff',
+    icon_color: '#e8eaed',
     custom_icon_path: '',
-
-    // State Colors
-    recording_color: '#e01b24',
-    processing_color: '#e5a50a',
-
-    // Theme
+    recording_color: '#ef5350',
+    processing_color: '#ffa726',
+    spinner_color: '#ffa726',
+    checkmark_color: '#66bb6a',
+    pill_animation: 'minimal',
+    checkmark_effect: 'fade',
     active_theme: 'default',
     follow_system_theme: false,
-
-    // Sound
     sound_enabled: true,
-    sound_volume: 0.5,
-    sound_start: 'default',
-    sound_stop: 'default',
+    sound_start_volume: 0.5,
+    sound_stop_volume: 0.5,
+    sound_finish_volume: 0.7,
+    sound_start: 'click',
+    sound_stop: 'click',
+    sound_finish: 'gentle-ping',
+    notifications_enabled: false,
+    processing_position: 'bottom-right',
+    processing_margin_bottom: 28,
+    processing_margin_horizontal: 28,
+    processing_size: 44,
+    pill_display_monitor: 'active',
 };
 
 function _loadSettings() {
@@ -184,7 +293,6 @@ function _parseColor(colorStr) {
         }
     }
     if (!rgba.parse(colorStr)) {
-        // Parse fehlgeschlagen — weißen Fallback verwenden
         rgba.parse('#ffffff');
     }
     return rgba;
@@ -197,7 +305,6 @@ function _colorToString(rgba, includeAlpha) {
     if (includeAlpha) {
         return `rgba(${r},${g},${b},${rgba.alpha.toFixed(2)})`;
     }
-    // Konsistent #hex zurückgeben (nicht rgba.to_string() das rgb() Format nutzt)
     let rh = r.toString(16).padStart(2, '0');
     let gh = g.toString(16).padStart(2, '0');
     let bh = b.toString(16).padStart(2, '0');
@@ -257,8 +364,162 @@ function _addSwitchRow(group, title, subtitle, settings, key, saveCallback) {
 }
 
 function _isDialogCancelled(e) {
-    // Gio.IOErrorEnum.CANCELLED wird geworfen wenn der User den Dialog abbricht
     return e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED);
+}
+
+function _getSoundsDir() {
+    // Sounds-Ordner relativ zur Extension
+    // Wir muessen den Pfad dynamisch ermitteln
+    let extensionDir = GLib.path_get_dirname(CONFIG_FILE).replace('/.config/jt-dictate', '');
+    // Fallback: schaue in bekannten Pfaden
+    let candidates = [
+        GLib.build_filenamev([GLib.get_home_dir(), '.local', 'share', 'gnome-shell', 'extensions', 'jt-dictate@jt.tools', 'sounds']),
+        GLib.build_filenamev(['/usr', 'share', 'gnome-shell', 'extensions', 'jt-dictate@jt.tools', 'sounds']),
+    ];
+    for (let path of candidates) {
+        if (GLib.file_test(path, GLib.FileTest.IS_DIR))
+            return path;
+    }
+    return candidates[0]; // Default
+}
+
+function _buildSoundOptions(extensionPath) {
+    let soundsDir = GLib.build_filenamev([extensionPath, 'sounds']);
+    let options = [
+        {id: 'none', name: 'Kein Ton'},
+    ];
+
+    // Built-in Sounds
+    for (let sound of BUILTIN_SOUNDS) {
+        let wavPath = GLib.build_filenamev([soundsDir, `${sound.id}.wav`]);
+        if (GLib.file_test(wavPath, GLib.FileTest.EXISTS)) {
+            options.push({id: `builtin:${sound.id}`, name: sound.name, path: wavPath});
+        } else {
+            // Auch wenn Datei fehlt, anzeigen (wird beim Abspielen ignoriert)
+            options.push({id: `builtin:${sound.id}`, name: sound.name, path: wavPath});
+        }
+    }
+
+    options.push({id: 'custom', name: 'Eigene Datei...'});
+
+    return options;
+}
+
+function _addSoundRow(group, title, subtitle, settings, key, soundOptions, window, saveCallback) {
+    let row = new Adw.ComboRow({title, subtitle});
+    let model = new Gtk.StringList();
+
+    let activeIdx = 0;
+    soundOptions.forEach((opt, idx) => {
+        model.append(opt.name);
+
+        if (opt.id === settings[key]) {
+            activeIdx = idx;
+        }
+        // Check if current setting matches a builtin path
+        if (opt.path && settings[key] === opt.path) {
+            activeIdx = idx;
+        }
+        // Check if current setting is a builtin:xxx format
+        if (settings[key] && settings[key].startsWith('builtin:') && opt.id === settings[key]) {
+            activeIdx = idx;
+        }
+        // Legacy: if setting is 'default', select first builtin or none
+        if (settings[key] === 'default' && opt.id === 'builtin:gentle-ping') {
+            activeIdx = idx;
+        }
+        // Custom file
+        if (settings[key] && settings[key] !== 'none' && settings[key] !== 'default'
+            && !settings[key].startsWith('builtin:')
+            && opt.id === 'custom'
+            && GLib.file_test(settings[key], GLib.FileTest.EXISTS)) {
+            activeIdx = idx;
+        }
+    });
+
+    row.set_model(model);
+    row.set_selected(activeIdx);
+
+    // Custom file row
+    let customRow = new Adw.ActionRow({
+        title: `${title} Datei`,
+        subtitle: (settings[key] && !settings[key].startsWith('builtin:')
+            && settings[key] !== 'default' && settings[key] !== 'none')
+            ? settings[key] : 'Keine Datei gewählt',
+        visible: soundOptions[activeIdx]?.id === 'custom',
+    });
+
+    let chooseBtn = new Gtk.Button({label: 'Wählen...', valign: Gtk.Align.CENTER});
+    chooseBtn.connect('clicked', () => {
+        let dialog = new Gtk.FileDialog({title: 'Sound-Datei wählen'});
+        let filter = new Gtk.FileFilter();
+        filter.set_name('Audio-Dateien');
+        filter.add_pattern('*.wav');
+        filter.add_pattern('*.ogg');
+        filter.add_pattern('*.oga');
+        let filters = new Gio.ListStore({item_type: Gtk.FileFilter.$gtype});
+        filters.append(filter);
+        dialog.set_filters(filters);
+        dialog.open(window, null, (d, res) => {
+            try {
+                let file = d.open_finish(res);
+                if (file) {
+                    settings[key] = file.get_path();
+                    customRow.set_subtitle(settings[key]);
+                    saveCallback();
+                }
+            } catch (e) {
+                if (!_isDialogCancelled(e))
+                    console.error(`JT Dictate: ${e}`);
+            }
+        });
+    });
+    customRow.add_suffix(chooseBtn);
+
+    // Preview button
+    let previewBtn = new Gtk.Button({
+        icon_name: 'media-playback-start-symbolic',
+        valign: Gtk.Align.CENTER,
+        tooltip_text: 'Vorhören',
+    });
+    previewBtn.connect('clicked', () => {
+        let idx = row.get_selected();
+        let opt = soundOptions[idx];
+        if (opt && opt.path && GLib.file_test(opt.path, GLib.FileTest.EXISTS)) {
+            try {
+                let volKey = `${key}_volume`;
+                let vol = settings[volKey] !== undefined ? settings[volKey] : 0.5;
+                let paVol = Math.round(vol * 65536);
+                GLib.spawn_command_line_async(`paplay --volume=${paVol} "${opt.path}"`);
+            } catch (e) {
+                console.error(`JT Dictate: Preview failed: ${e}`);
+            }
+        }
+    });
+    row.add_suffix(previewBtn);
+
+    row.connect('notify::selected', () => {
+        let idx = row.get_selected();
+        let opt = soundOptions[idx];
+        if (opt.id === 'custom') {
+            customRow.set_visible(true);
+        } else {
+            customRow.set_visible(false);
+            // Speichere die Sound-ID (z.B. 'click', 'gentle-ping'), nicht den Dateipfad
+            // So sind Settings portabel zwischen Systemen
+            if (opt.id.startsWith('builtin:')) {
+                settings[key] = opt.id.replace('builtin:', '');
+            } else {
+                settings[key] = opt.id;
+            }
+            saveCallback();
+        }
+    });
+
+    group.add(row);
+    group.add(customRow);
+
+    return {row, customRow};
 }
 
 export default class JtDictatePrefs extends ExtensionPreferences {
@@ -267,90 +528,31 @@ export default class JtDictatePrefs extends ExtensionPreferences {
         let _initializing = true;
         const save = () => { if (!_initializing) _saveSettings(settings); };
 
+        let extensionPath = this.path;
+        let soundOptions = _buildSoundOptions(extensionPath);
+
         window.set_default_size(700, 800);
 
-        // ─── Seite 1: Aussehen ───
-        let appearancePage = new Adw.PreferencesPage({
-            title: 'Aussehen',
-            icon_name: 'preferences-desktop-appearance-symbolic',
+        // --- Seite 1: Aufnahme-Pill ---
+        let pillPage = new Adw.PreferencesPage({
+            title: 'Aufnahme-Pill',
+            icon_name: 'audio-input-microphone-symbolic',
         });
-        window.add(appearancePage);
+        window.add(pillPage);
 
-        // Theme-Auswahl
-        let themeGroup = new Adw.PreferencesGroup({
-            title: 'Theme',
-            description: 'Vorkonfigurierte Themes oder System-Theme folgen',
-        });
-        appearancePage.add(themeGroup);
-
-        // Follow System Theme
-        _addSwitchRow(themeGroup, 'System-Theme folgen',
-            'Passt sich automatisch an das GTK-Theme an (Dark/Light)', settings, 'follow_system_theme', save);
-
-        // Theme Preset Dropdown
-        let themeRow = new Adw.ComboRow({
-            title: 'Theme-Preset',
-            subtitle: 'Vorkonfiguriertes Farbschema',
-        });
-        let themeModel = new Gtk.StringList();
-        let themeIds = Object.keys(THEME_PRESETS);
-        let activeThemeIdx = 0;
-        themeIds.forEach((id, idx) => {
-            themeModel.append(THEME_PRESETS[id].name);
-            if (id === settings.active_theme) activeThemeIdx = idx;
-        });
-
-        // Prüfe ob custom themes existieren
-        let customThemes = _loadCustomThemes();
-        let customThemeIds = Object.keys(customThemes);
-        customThemeIds.forEach((id, idx) => {
-            themeModel.append(customThemes[id].name);
-            if (id === settings.active_theme) activeThemeIdx = themeIds.length + idx;
-        });
-
-        themeRow.set_model(themeModel);
-        themeRow.set_selected(activeThemeIdx);
-        themeRow.connect('notify::selected', () => {
-            let idx = themeRow.get_selected();
-            let allIds = [...themeIds, ...customThemeIds];
-            let selectedId = allIds[idx];
-            if (!selectedId) return;
-
-            settings.active_theme = selectedId;
-            let preset = THEME_PRESETS[selectedId] || customThemes[selectedId];
-            if (preset) {
-                // Übernehme Theme-Werte
-                for (let [key, value] of Object.entries(preset)) {
-                    if (key !== 'name' && key in settings) {
-                        settings[key] = value;
-                    }
-                }
-            }
-            save();
-            // Fenster schließen damit User es mit aktualisierten Werten neu öffnet
-            window.close();
-        });
-        themeGroup.add(themeRow);
-
-        // Pill-Form
-        let pillGroup = new Adw.PreferencesGroup({
-            title: 'Pill-Form',
+        // Form & Position
+        let pillFormGroup = new Adw.PreferencesGroup({
+            title: 'Form & Position',
             description: 'Größe und Position der Aufnahme-Anzeige',
         });
-        appearancePage.add(pillGroup);
+        pillPage.add(pillFormGroup);
 
-        _addSpinRow(pillGroup, 'Breite', 'Pixel', settings, 'pill_width', 100, 600, 10, 0, save);
-        _addSpinRow(pillGroup, 'Höhe', 'Pixel', settings, 'pill_height', 24, 80, 2, 0, save);
-        _addSpinRow(pillGroup, 'Eckenradius', 'Pixel', settings, 'pill_border_radius', 0, 40, 1, 0, save);
-        _addSpinRow(pillGroup, 'Abstand oben', 'Pixel vom Bildschirmrand', settings, 'pill_margin_top', 0, 200, 5, 0, save);
-        _addSpinRow(pillGroup, 'Abstand horizontal', 'Pixel', settings, 'pill_margin_horizontal', 0, 200, 5, 0, save);
+        _addSpinRow(pillFormGroup, 'Breite', 'Pixel', settings, 'pill_width', 100, 600, 10, 0, save);
+        _addSpinRow(pillFormGroup, 'Höhe', 'Pixel', settings, 'pill_height', 24, 80, 2, 0, save);
+        _addSpinRow(pillFormGroup, 'Eckenradius', 'Pixel', settings, 'pill_border_radius', 0, 40, 1, 0, save);
+        _addSpinRow(pillFormGroup, 'Abstand oben/unten', 'Pixel vom Bildschirmrand', settings, 'pill_margin_top', 0, 200, 5, 0, save);
+        _addSpinRow(pillFormGroup, 'Abstand horizontal', 'Pixel', settings, 'pill_margin_horizontal', 0, 200, 5, 0, save);
 
-        // Pill Position
-        let posRow = new Adw.ComboRow({
-            title: 'Position',
-            subtitle: 'Wo die Pill angezeigt wird',
-        });
-        let posModel = new Gtk.StringList();
         let positions = [
             {id: 'top-center', name: 'Oben Mitte'},
             {id: 'top-left', name: 'Oben Links'},
@@ -359,6 +561,12 @@ export default class JtDictatePrefs extends ExtensionPreferences {
             {id: 'bottom-left', name: 'Unten Links'},
             {id: 'bottom-right', name: 'Unten Rechts'},
         ];
+
+        let posRow = new Adw.ComboRow({
+            title: 'Position',
+            subtitle: 'Wo die Pill angezeigt wird',
+        });
+        let posModel = new Gtk.StringList();
         let activePosIdx = 0;
         positions.forEach((pos, idx) => {
             posModel.append(pos.name);
@@ -370,70 +578,51 @@ export default class JtDictatePrefs extends ExtensionPreferences {
             settings.pill_position = positions[posRow.get_selected()].id;
             save();
         });
-        pillGroup.add(posRow);
+        pillFormGroup.add(posRow);
 
-        // Farben & Effekte
-        let colorGroup = new Adw.PreferencesGroup({
-            title: 'Farben & Effekte',
-            description: 'Hintergrund, Border, Schatten',
+        // Bildschirm-Auswahl
+        let monitorRow = new Adw.ComboRow({
+            title: 'Bildschirm',
+            subtitle: 'Auf welchem Bildschirm die Pill angezeigt wird',
         });
-        appearancePage.add(colorGroup);
-
-        _addColorRow(colorGroup, 'Hintergrundfarbe', 'Pill-Hintergrund', settings, 'pill_bg_color', true, save);
-        _addColorRow(colorGroup, 'Border-Farbe', 'Umrandung', settings, 'pill_border_color', true, save);
-        _addSpinRow(colorGroup, 'Border-Stärke', 'Pixel', settings, 'pill_border_width', 0, 5, 1, 0, save);
-        _addSpinRow(colorGroup, 'Blur-Stärke', 'Pixel (Backdrop-Filter)', settings, 'pill_blur', 0, 40, 1, 0, save);
-        _addSpinRow(colorGroup, 'Schatten-Intensität', '0 = kein Schatten', settings, 'pill_shadow_intensity', 0, 1, 0.05, 2, save);
-
-        // State-Farben
-        _addColorRow(colorGroup, 'Aufnahme-Farbe', 'Icon-Farbe während Aufnahme', settings, 'recording_color', false, save);
-        _addColorRow(colorGroup, 'Verarbeitungs-Farbe', 'Icon-Farbe während Verarbeitung', settings, 'processing_color', false, save);
-
-        // ─── Seite 2: Visualisierung ───
-        let vizPage = new Adw.PreferencesPage({
-            title: 'Visualisierung',
-            icon_name: 'display-symbolic',
+        let monitorModel = new Gtk.StringList();
+        let monitorOptions = [
+            {id: 'active', name: 'Aktiver Bildschirm (Maus)'},
+            {id: 'primary', name: 'Primärer Bildschirm'},
+        ];
+        let activeMonitorIdx = 0;
+        monitorOptions.forEach((opt, idx) => {
+            monitorModel.append(opt.name);
+            if (opt.id === settings.pill_display_monitor) activeMonitorIdx = idx;
         });
-        window.add(vizPage);
-
-        let vizGroup = new Adw.PreferencesGroup({
-            title: 'Audio-Visualisierung',
-            description: 'Wie die Spracheingabe dargestellt wird',
-        });
-        vizPage.add(vizGroup);
-
-        // Visualization Type
-        let vizRow = new Adw.ComboRow({
-            title: 'Visualisierungstyp',
-            subtitle: 'Art der Audio-Anzeige',
-        });
-        let vizModel = new Gtk.StringList();
-        let activeVizIdx = 0;
-        VISUALIZATION_TYPES.forEach((vt, idx) => {
-            vizModel.append(vt.name);
-            if (vt.id === settings.visualization_type) activeVizIdx = idx;
-        });
-        vizRow.set_model(vizModel);
-        vizRow.set_selected(activeVizIdx);
-        vizRow.connect('notify::selected', () => {
-            settings.visualization_type = VISUALIZATION_TYPES[vizRow.get_selected()].id;
+        monitorRow.set_model(monitorModel);
+        monitorRow.set_selected(activeMonitorIdx);
+        monitorRow.connect('notify::selected', () => {
+            settings.pill_display_monitor = monitorOptions[monitorRow.get_selected()].id;
             save();
         });
-        vizGroup.add(vizRow);
+        pillFormGroup.add(monitorRow);
 
-        _addSpinRow(vizGroup, 'Anzahl Balken', 'Nur für Balken/Equalizer', settings, 'bar_count', 3, 20, 1, 0, save);
-        _addSwitchRow(vizGroup, 'Farbverlauf', 'Gradient von links nach rechts', settings, 'bar_gradient', save);
-        _addColorRow(vizGroup, 'Farbe Links', 'Startfarbe des Verlaufs', settings, 'bar_color_left', false, save);
-        _addColorRow(vizGroup, 'Farbe Rechts', 'Endfarbe des Verlaufs', settings, 'bar_color_right', false, save);
+        // Aussehen
+        let pillLookGroup = new Adw.PreferencesGroup({
+            title: 'Aussehen',
+            description: 'Hintergrund, Border, Schatten',
+        });
+        pillPage.add(pillLookGroup);
 
-        // Icon
+        _addColorRow(pillLookGroup, 'Hintergrundfarbe', 'Pill-Hintergrund', settings, 'pill_bg_color', true, save);
+        _addColorRow(pillLookGroup, 'Border-Farbe', 'Umrandung', settings, 'pill_border_color', true, save);
+        _addSpinRow(pillLookGroup, 'Border-Stärke', 'Pixel', settings, 'pill_border_width', 0, 5, 1, 0, save);
+        _addSpinRow(pillLookGroup, 'Blur-Stärke', 'Pixel (Backdrop-Filter)', settings, 'pill_blur', 0, 40, 1, 0, save);
+        _addSpinRow(pillLookGroup, 'Schatten-Intensität', '0 = kein Schatten', settings, 'pill_shadow_intensity', 0, 1, 0.05, 2, save);
+
+        // Mikrofon-Icon
         let iconGroup = new Adw.PreferencesGroup({
             title: 'Mikrofon-Icon',
             description: 'Icon in der Pill anpassen',
         });
-        vizPage.add(iconGroup);
+        pillPage.add(iconGroup);
 
-        // Icon Auswahl
         let iconRow = new Adw.ComboRow({
             title: 'Icon',
             subtitle: 'Vordefiniertes Icon wählen',
@@ -445,6 +634,7 @@ export default class JtDictatePrefs extends ExtensionPreferences {
             {id: 'audio-speakers-symbolic', name: 'Lautsprecher'},
             {id: 'emblem-music-symbolic', name: 'Musik'},
             {id: 'face-smile-symbolic', name: 'Smiley'},
+            {id: 'janeway', name: 'Janeway'},
             {id: 'custom', name: 'Eigenes Icon...'},
         ];
         let activeIconIdx = 0;
@@ -452,8 +642,7 @@ export default class JtDictatePrefs extends ExtensionPreferences {
             iconModel.append(opt.name);
             if (opt.id === settings.icon_name) activeIconIdx = idx;
         });
-        // Wenn custom icon path gesetzt, custom auswählen
-        if (settings.custom_icon_path) activeIconIdx = iconOptions.length - 1;
+        if (settings.icon_name === 'custom' && settings.custom_icon_path) activeIconIdx = iconOptions.length - 1;
         iconRow.set_model(iconModel);
         iconRow.set_selected(activeIconIdx);
 
@@ -510,171 +699,252 @@ export default class JtDictatePrefs extends ExtensionPreferences {
         });
 
         _addColorRow(iconGroup, 'Icon-Farbe', 'Farbe des Icons in der Pill', settings, 'icon_color', false, save);
+        _addColorRow(iconGroup, 'Aufnahme-Farbe', 'Icon-Farbe während Aufnahme', settings, 'recording_color', false, save);
 
-        // ─── Seite 3: Sound ───
+        // --- Seite 2: Visualisierung ---
+        let vizPage = new Adw.PreferencesPage({
+            title: 'Visualisierung',
+            icon_name: 'display-symbolic',
+        });
+        window.add(vizPage);
+
+        // Audio-Visualisierung
+        let vizGroup = new Adw.PreferencesGroup({
+            title: 'Audio-Visualisierung',
+            description: 'Wie die Spracheingabe dargestellt wird',
+        });
+        vizPage.add(vizGroup);
+
+        let vizRow = new Adw.ComboRow({
+            title: 'Visualisierungstyp',
+            subtitle: 'Art der Audio-Anzeige',
+        });
+        let vizModel = new Gtk.StringList();
+        let activeVizIdx = 0;
+        VISUALIZATION_TYPES.forEach((vt, idx) => {
+            vizModel.append(vt.name);
+            if (vt.id === settings.visualization_type) activeVizIdx = idx;
+        });
+        vizRow.set_model(vizModel);
+        vizRow.set_selected(activeVizIdx);
+        vizRow.connect('notify::selected', () => {
+            settings.visualization_type = VISUALIZATION_TYPES[vizRow.get_selected()].id;
+            save();
+        });
+        vizGroup.add(vizRow);
+
+        _addSpinRow(vizGroup, 'Anzahl Balken', 'Nur für Balken/Equalizer (3-30)', settings, 'bar_count', 3, 30, 1, 0, save);
+        _addSwitchRow(vizGroup, 'Farbverlauf', 'Gradient von links nach rechts', settings, 'bar_gradient', save);
+        _addColorRow(vizGroup, 'Farbe Links', 'Startfarbe des Verlaufs', settings, 'bar_color_left', false, save);
+        _addColorRow(vizGroup, 'Farbe Rechts', 'Endfarbe des Verlaufs', settings, 'bar_color_right', false, save);
+
+        // Status-Anzeige (Processing)
+        let statusGroup = new Adw.PreferencesGroup({
+            title: 'Status-Anzeige (Processing)',
+            description: 'Position und Aussehen des Processing-Kreises',
+        });
+        vizPage.add(statusGroup);
+
+        let procPosRow = new Adw.ComboRow({
+            title: 'Processing-Position',
+            subtitle: 'Wo der Processing-Kreis angezeigt wird',
+        });
+        let procPosModel = new Gtk.StringList();
+        let activeProcPosIdx = 0;
+        positions.forEach((pos, idx) => {
+            procPosModel.append(pos.name);
+            if (pos.id === settings.processing_position) activeProcPosIdx = idx;
+        });
+        procPosRow.set_model(procPosModel);
+        procPosRow.set_selected(activeProcPosIdx);
+        procPosRow.connect('notify::selected', () => {
+            settings.processing_position = positions[procPosRow.get_selected()].id;
+            save();
+        });
+        statusGroup.add(procPosRow);
+
+        _addSpinRow(statusGroup, 'Abstand unten', 'Pixel vom unteren Rand', settings, 'processing_margin_bottom', 0, 200, 5, 0, save);
+        _addSpinRow(statusGroup, 'Abstand horizontal', 'Pixel vom seitlichen Rand', settings, 'processing_margin_horizontal', 0, 200, 5, 0, save);
+        _addSpinRow(statusGroup, 'Größe', 'Durchmesser des Processing-Kreises', settings, 'processing_size', 24, 80, 2, 0, save);
+        _addColorRow(statusGroup, 'Verarbeitungs-Farbe', 'Hintergrund des Processing-Kreises', settings, 'processing_color', false, save);
+        _addColorRow(statusGroup, 'Spinner-Farbe', 'Farbe des drehenden Lade-Spinners', settings, 'spinner_color', false, save);
+        _addColorRow(statusGroup, 'Häkchen-Farbe', 'Farbe des Fertig-Häkchens', settings, 'checkmark_color', false, save);
+
+        // Animation
+        let animGroup = new Adw.PreferencesGroup({
+            title: 'Animation',
+            description: 'Animations-Stil der Pill-Übergänge',
+        });
+        vizPage.add(animGroup);
+
+        let animRow = new Adw.ComboRow({
+            title: 'Animations-Stil',
+            subtitle: 'Wie sich die Pill bewegt und verwandelt',
+        });
+        let animModel = new Gtk.StringList();
+        let animOptions = [
+            {id: 'smooth', name: 'Smooth'},
+            {id: 'bounce', name: 'Bounce'},
+            {id: 'minimal', name: 'Minimal'},
+        ];
+        let activeAnimIdx = 0;
+        animOptions.forEach((opt, idx) => {
+            animModel.append(opt.name);
+            if (opt.id === settings.pill_animation) activeAnimIdx = idx;
+        });
+        animRow.set_model(animModel);
+        animRow.set_selected(activeAnimIdx);
+        animRow.connect('notify::selected', () => {
+            settings.pill_animation = animOptions[animRow.get_selected()].id;
+            save();
+        });
+        animGroup.add(animRow);
+
+        // Häkchen-Effekt
+        let checkEffectRow = new Adw.ComboRow({
+            title: 'Häkchen-Effekt',
+            subtitle: 'Wie das Fertig-Häkchen erscheint',
+        });
+        let checkEffectModel = new Gtk.StringList();
+        let checkEffectOptions = [
+            {id: 'fade', name: 'Fade'},
+            {id: 'zoom', name: 'Zoom'},
+        ];
+        let activeCheckEffectIdx = 0;
+        checkEffectOptions.forEach((opt, idx) => {
+            checkEffectModel.append(opt.name);
+            if (opt.id === settings.checkmark_effect) activeCheckEffectIdx = idx;
+        });
+        checkEffectRow.set_model(checkEffectModel);
+        checkEffectRow.set_selected(activeCheckEffectIdx);
+        checkEffectRow.connect('notify::selected', () => {
+            settings.checkmark_effect = checkEffectOptions[checkEffectRow.get_selected()].id;
+            save();
+        });
+        animGroup.add(checkEffectRow);
+
+        // --- Seite 3: Sound & Benachrichtigungen ---
         let soundPage = new Adw.PreferencesPage({
             title: 'Sound',
             icon_name: 'audio-speakers-symbolic',
         });
         window.add(soundPage);
 
-        let soundGroup = new Adw.PreferencesGroup({
+        // Feedback-Toene
+        let soundEnableGroup = new Adw.PreferencesGroup({
             title: 'Feedback-Töne',
-            description: 'Akustisches Feedback bei Start/Stop der Aufnahme',
+            description: 'Akustisches Feedback aktivieren/deaktivieren',
         });
-        soundPage.add(soundGroup);
+        soundPage.add(soundEnableGroup);
 
-        _addSwitchRow(soundGroup, 'Töne aktiviert',
+        _addSwitchRow(soundEnableGroup, 'Töne aktiviert',
             'Akustisches Feedback bei Aufnahme-Start und -Stop', settings, 'sound_enabled', save);
 
-        _addSpinRow(soundGroup, 'Lautstärke', '0 = stumm, 1 = voll',
-            settings, 'sound_volume', 0, 1, 0.05, 2, save);
-
-        // Start-Sound
-        let startSoundOptions = [
-            {id: 'default', name: 'Standard (System)'},
-            {id: 'none', name: 'Kein Ton'},
-            {id: 'custom', name: 'Eigene Datei...'},
-        ];
-        let startSoundRow = new Adw.ComboRow({
+        // Start-Ton
+        let startSoundGroup = new Adw.PreferencesGroup({
             title: 'Start-Ton',
-            subtitle: 'Ton bei Aufnahme-Start',
+            description: 'Ton bei Aufnahme-Start',
         });
-        let startSoundModel = new Gtk.StringList();
-        let activeStartIdx = 0;
-        startSoundOptions.forEach((opt, idx) => {
-            startSoundModel.append(opt.name);
-            if (opt.id === settings.sound_start) activeStartIdx = idx;
-            // Wenn custom path gesetzt, custom auswählen
-            if (settings.sound_start !== 'default' && settings.sound_start !== 'none'
-                && opt.id === 'custom') activeStartIdx = idx;
-        });
-        startSoundRow.set_model(startSoundModel);
-        startSoundRow.set_selected(activeStartIdx);
+        soundPage.add(startSoundGroup);
 
-        let customStartRow = new Adw.ActionRow({
-            title: 'Start-Sound Datei',
-            subtitle: (settings.sound_start !== 'default' && settings.sound_start !== 'none')
-                ? settings.sound_start : 'Keine Datei gewählt',
-            visible: activeStartIdx === 2,
-        });
-        let chooseStartBtn = new Gtk.Button({label: 'Wählen...', valign: Gtk.Align.CENTER});
-        chooseStartBtn.connect('clicked', () => {
-            let dialog = new Gtk.FileDialog({title: 'Sound-Datei wählen'});
-            let filter = new Gtk.FileFilter();
-            filter.set_name('Audio-Dateien');
-            filter.add_pattern('*.wav');
-            filter.add_pattern('*.ogg');
-            filter.add_pattern('*.oga');
-            let filters = new Gio.ListStore({item_type: Gtk.FileFilter.$gtype});
-            filters.append(filter);
-            dialog.set_filters(filters);
-            dialog.open(window, null, (d, res) => {
-                try {
-                    let file = d.open_finish(res);
-                    if (file) {
-                        settings.sound_start = file.get_path();
-                        customStartRow.set_subtitle(settings.sound_start);
-                        save();
-                    }
-                } catch (e) {
-                    if (!_isDialogCancelled(e))
-                        console.error(`JT Dictate: ${e}`);
-                }
-            });
-        });
-        customStartRow.add_suffix(chooseStartBtn);
+        _addSoundRow(startSoundGroup, 'Start-Ton', 'Ton bei Aufnahme-Start',
+            settings, 'sound_start', soundOptions, window, save);
+        _addSpinRow(startSoundGroup, 'Lautstärke', '0 = stumm, 1 = voll',
+            settings, 'sound_start_volume', 0, 1, 0.05, 2, save);
 
-        startSoundRow.connect('notify::selected', () => {
-            let idx = startSoundRow.get_selected();
-            let opt = startSoundOptions[idx];
-            if (opt.id === 'custom') {
-                customStartRow.set_visible(true);
-            } else {
-                customStartRow.set_visible(false);
-                settings.sound_start = opt.id;
-                save();
-            }
-        });
-        soundGroup.add(startSoundRow);
-        soundGroup.add(customStartRow);
-
-        // Stop-Sound
-        let stopSoundOptions = [
-            {id: 'default', name: 'Standard (System)'},
-            {id: 'none', name: 'Kein Ton'},
-            {id: 'custom', name: 'Eigene Datei...'},
-        ];
-        let stopSoundRow = new Adw.ComboRow({
+        // Stop-Ton
+        let stopSoundGroup = new Adw.PreferencesGroup({
             title: 'Stop-Ton',
-            subtitle: 'Ton bei Aufnahme-Stop',
+            description: 'Ton bei Aufnahme-Stop',
         });
-        let stopSoundModel = new Gtk.StringList();
-        let activeStopIdx = 0;
-        stopSoundOptions.forEach((opt, idx) => {
-            stopSoundModel.append(opt.name);
-            if (opt.id === settings.sound_stop) activeStopIdx = idx;
-            if (settings.sound_stop !== 'default' && settings.sound_stop !== 'none'
-                && opt.id === 'custom') activeStopIdx = idx;
-        });
-        stopSoundRow.set_model(stopSoundModel);
-        stopSoundRow.set_selected(activeStopIdx);
+        soundPage.add(stopSoundGroup);
 
-        let customStopRow = new Adw.ActionRow({
-            title: 'Stop-Sound Datei',
-            subtitle: (settings.sound_stop !== 'default' && settings.sound_stop !== 'none')
-                ? settings.sound_stop : 'Keine Datei gewählt',
-            visible: activeStopIdx === 2,
-        });
-        let chooseStopBtn = new Gtk.Button({label: 'Wählen...', valign: Gtk.Align.CENTER});
-        chooseStopBtn.connect('clicked', () => {
-            let dialog = new Gtk.FileDialog({title: 'Sound-Datei wählen'});
-            let filter = new Gtk.FileFilter();
-            filter.set_name('Audio-Dateien');
-            filter.add_pattern('*.wav');
-            filter.add_pattern('*.ogg');
-            filter.add_pattern('*.oga');
-            let filters = new Gio.ListStore({item_type: Gtk.FileFilter.$gtype});
-            filters.append(filter);
-            dialog.set_filters(filters);
-            dialog.open(window, null, (d, res) => {
-                try {
-                    let file = d.open_finish(res);
-                    if (file) {
-                        settings.sound_stop = file.get_path();
-                        customStopRow.set_subtitle(settings.sound_stop);
-                        save();
-                    }
-                } catch (e) {
-                    if (!_isDialogCancelled(e))
-                        console.error(`JT Dictate: ${e}`);
-                }
-            });
-        });
-        customStopRow.add_suffix(chooseStopBtn);
+        _addSoundRow(stopSoundGroup, 'Stop-Ton', 'Ton bei Aufnahme-Stop',
+            settings, 'sound_stop', soundOptions, window, save);
+        _addSpinRow(stopSoundGroup, 'Lautstärke', '0 = stumm, 1 = voll',
+            settings, 'sound_stop_volume', 0, 1, 0.05, 2, save);
 
-        stopSoundRow.connect('notify::selected', () => {
-            let idx = stopSoundRow.get_selected();
-            let opt = stopSoundOptions[idx];
-            if (opt.id === 'custom') {
-                customStopRow.set_visible(true);
-            } else {
-                customStopRow.set_visible(false);
-                settings.sound_stop = opt.id;
-                save();
-            }
+        // Fertig-Ton
+        let finishSoundGroup = new Adw.PreferencesGroup({
+            title: 'Fertig-Ton',
+            description: 'Ton wenn Transkription abgeschlossen',
         });
-        soundGroup.add(stopSoundRow);
-        soundGroup.add(customStopRow);
+        soundPage.add(finishSoundGroup);
 
-        // ─── Seite 4: Export/Import ───
+        _addSoundRow(finishSoundGroup, 'Fertig-Ton', 'Ton wenn Transkription abgeschlossen',
+            settings, 'sound_finish', soundOptions, window, save);
+        _addSpinRow(finishSoundGroup, 'Lautstärke', '0 = stumm, 1 = voll',
+            settings, 'sound_finish_volume', 0, 1, 0.05, 2, save);
+
+        // Benachrichtigungen
+        let notifGroup = new Adw.PreferencesGroup({
+            title: 'Benachrichtigungen',
+            description: 'GNOME-System-Benachrichtigungen',
+        });
+        soundPage.add(notifGroup);
+
+        _addSwitchRow(notifGroup, 'GNOME-Benachrichtigungen',
+            'System-Benachrichtigungen anzeigen (standardmäßig deaktiviert)', settings, 'notifications_enabled', save);
+
+        // --- Seite 4: Theme & Daten ---
         let dataPage = new Adw.PreferencesPage({
-            title: 'Daten',
+            title: 'Theme & Daten',
             icon_name: 'document-save-symbolic',
         });
         window.add(dataPage);
 
-        // Settings Export/Import
+        // Theme
+        let themeGroup = new Adw.PreferencesGroup({
+            title: 'Theme',
+            description: 'Vorkonfigurierte Themes oder System-Theme folgen',
+        });
+        dataPage.add(themeGroup);
+
+        _addSwitchRow(themeGroup, 'System-Theme folgen',
+            'Passt sich automatisch an das GTK-Theme an (Dark/Light)', settings, 'follow_system_theme', save);
+
+        let themeRow = new Adw.ComboRow({
+            title: 'Theme-Preset',
+            subtitle: 'Vorkonfiguriertes Farbschema',
+        });
+        let themeModel = new Gtk.StringList();
+        let themeIds = Object.keys(THEME_PRESETS);
+        let activeThemeIdx = 0;
+        themeIds.forEach((id, idx) => {
+            themeModel.append(THEME_PRESETS[id].name);
+            if (id === settings.active_theme) activeThemeIdx = idx;
+        });
+
+        let customThemes = _loadCustomThemes();
+        let customThemeIds = Object.keys(customThemes);
+        customThemeIds.forEach((id, idx) => {
+            themeModel.append(customThemes[id].name);
+            if (id === settings.active_theme) activeThemeIdx = themeIds.length + idx;
+        });
+
+        themeRow.set_model(themeModel);
+        themeRow.set_selected(activeThemeIdx);
+        themeRow.connect('notify::selected', () => {
+            let idx = themeRow.get_selected();
+            let allIds = [...themeIds, ...customThemeIds];
+            let selectedId = allIds[idx];
+            if (!selectedId) return;
+
+            settings.active_theme = selectedId;
+            let preset = THEME_PRESETS[selectedId] || customThemes[selectedId];
+            if (preset) {
+                for (let [key, value] of Object.entries(preset)) {
+                    if (key !== 'name' && key in settings) {
+                        settings[key] = value;
+                    }
+                }
+            }
+            save();
+            window.close();
+        });
+        themeGroup.add(themeRow);
+
+        // Einstellungen Export/Import
         let settingsDataGroup = new Adw.PreferencesGroup({
             title: 'Einstellungen',
             description: 'Alle Einstellungen exportieren oder importieren',
@@ -728,7 +998,6 @@ export default class JtDictatePrefs extends ExtensionPreferences {
                         let [success, contents] = file.load_contents(null);
                         if (success) {
                             let imported = JSON.parse(new TextDecoder().decode(contents));
-                            // Nur bekannte Keys übernehmen
                             for (let [key, value] of Object.entries(imported)) {
                                 if (key in DEFAULT_SETTINGS) {
                                     settings[key] = value;
@@ -748,7 +1017,7 @@ export default class JtDictatePrefs extends ExtensionPreferences {
         importSettingsRow.add_suffix(importBtn);
         settingsDataGroup.add(importSettingsRow);
 
-        // Theme Export/Import
+        // Themes Export/Import
         let themeDataGroup = new Adw.PreferencesGroup({
             title: 'Themes',
             description: 'Eigene Themes exportieren, importieren oder teilen',
@@ -762,13 +1031,12 @@ export default class JtDictatePrefs extends ExtensionPreferences {
         let exportThemeBtn = new Gtk.Button({label: 'Exportieren', valign: Gtk.Align.CENTER});
         exportThemeBtn.add_css_class('suggested-action');
         exportThemeBtn.connect('clicked', () => {
-            // Theme-relevante Keys extrahieren
             let themeData = {name: settings.active_theme || 'custom'};
             let themeKeys = [
                 'pill_bg_color', 'pill_border_color', 'pill_border_width',
                 'pill_blur', 'pill_shadow_intensity',
                 'bar_color_left', 'bar_color_right', 'bar_gradient',
-                'icon_color', 'recording_color', 'processing_color',
+                'icon_color', 'recording_color', 'processing_color', 'spinner_color', 'checkmark_color',
             ];
             for (let key of themeKeys) {
                 themeData[key] = settings[key];
@@ -817,15 +1085,13 @@ export default class JtDictatePrefs extends ExtensionPreferences {
                             let themeName = themeData.name || 'imported';
                             let themeId = `custom-${themeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
 
-                            // Speichere als custom theme
                             _saveCustomTheme(themeId, themeData);
 
-                            // Wende sofort an (nur Theme-relevante Keys)
                             let themeKeys = [
                                 'pill_bg_color', 'pill_border_color', 'pill_border_width',
                                 'pill_blur', 'pill_shadow_intensity',
                                 'bar_color_left', 'bar_color_right', 'bar_gradient',
-                                'icon_color', 'recording_color', 'processing_color',
+                                'icon_color', 'recording_color', 'processing_color', 'spinner_color', 'checkmark_color',
                             ];
                             for (let key of themeKeys) {
                                 if (key in themeData) {
@@ -848,7 +1114,6 @@ export default class JtDictatePrefs extends ExtensionPreferences {
         importThemeRow.add_suffix(importThemeBtn);
         themeDataGroup.add(importThemeRow);
 
-        // Initialisierung abgeschlossen — ab jetzt lösen Widget-Änderungen saves aus
         _initializing = false;
     }
 }

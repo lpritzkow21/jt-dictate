@@ -1,5 +1,35 @@
 # Changelog - JT Dictate
 
+## [0.3.0] - 2026-04-02
+
+Großes Animations-Update mit Processing-Visualisierung, Sound-Bibliothek, Browser-Demo und vollständiger Anpassbarkeit.
+
+### Neue Features
+- **3 Animations-Stile**: Smooth (Scale+Slide), Bounce (Spring-Physik), Minimal (In-Place Crossfade)
+- **Processing-Animation**: Pill morpht zum Kreis mit drehendem Spinner, Häkchen bei Fertigstellung
+- **Processing-Kreis einstellbar**: Position, Größe, Abstände separat konfigurierbar
+- **15 Built-in Sounds**: Gentle Ping, Bubble, Chime, Click, Cosmic, Crystal, Drop, Echo, Fairy, Glow, Harp, Laser, Nudge, Pluck, Whoosh
+- **Individuelle Lautstärke pro Sound**: Start-, Stop- und Fertig-Ton jeweils separat regelbar
+- **10 Theme-Presets**: Standard, Neon, Minimal, Ocean, Sunset + neu: Aurora, Cherry, Forest, Midnight, Rosé
+- **Spinner-/Häkchen-Farbe**: Separat einstellbar in jedem Theme
+- **GNOME-Benachrichtigungen**: Optional (standardmäßig deaktiviert)
+- **Browser-Demo**: Interaktive Simulation der Extension (`simulation.html`) zum Testen aller Einstellungen
+
+### Verbesserungen
+- **Pill-Popup bei Mausklick**: Visualisierung erscheint jetzt auch bei Linksklick auf Panel-Button
+- **Überarbeitetes Standard-Theme**: Modernes Design mit Blur-Effekt und sanfteren Farben
+- **15 Balken als Standard**: Mehr Detail in der Audio-Visualisierung
+- **Settings-Tabs neu strukturiert**: Aufnahme-Pill, Visualisierung, Sound, Theme & Daten
+- **Sounds portabel gespeichert**: Bare Names statt Dateipfade für Kompatibilität
+- **Default-Position**: Pill standardmäßig unten-Mitte (statt oben)
+
+### Fixes
+- Sound-Auflösung für bare Namen (click, gentle-ping) im Python-Backend
+- Pill verschwindet jetzt zuverlässig nach Processing-Animation
+- Häkchen wird korrekt farbig angezeigt (SVG polyline statt path)
+
+---
+
 ## [0.2.0] - 2026-03-28
 
 Großes UI/UX-Update mit Recording Pill, Visualisierungen, Theme-System und Preferences Panel.

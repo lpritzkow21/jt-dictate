@@ -9,15 +9,30 @@ Click the panel icon or press a hotkey, speak, and your speech is transcribed of
 - **Offline transcription** using faster-whisper (runs entirely on your machine)
 - **GNOME Shell Extension** with panel icon (left-click to toggle, right-click for settings)
 - **Recording Pill** — floating overlay widget with audio visualization during recording
-- **5 visualization types**: Bars, Waveform, Pulse, Circle, Equalizer
+- **3 animation styles**: Smooth (scale+slide), Bounce (spring physics), Minimal (in-place crossfade)
+- **Processing visualization** — pill morphs to spinning circle, shows checkmark on completion
+- **5 visualization types**: Bars, Waveform, Pulse, Circle, Equalizer (default: 15 bars)
+- **15 built-in notification sounds** with per-sound volume control
 - **Full customization** via GNOME Preferences panel (right-click → Settings → Alle Einstellungen)
-- **Theme system** — built-in presets (Default, Neon, Minimal, Ocean, Sunset) + custom themes
+- **Theme system** — 10 built-in presets (Standard, Neon, Minimal, Ocean, Sunset, Aurora, Cherry, Forest, Midnight, Rosé) + custom themes
 - **Dark/Light mode** — follows GNOME system color scheme
 - **Settings & theme export/import** as JSON
+- **Optional GNOME notifications** (disabled by default)
 - **Clipboard integration**: transcribed text is automatically copied
 - **Multiple Whisper models**: tiny / base / small / medium
 - **CLI control**: `--toggle`, `--start`, `--stop`, `--status` for hotkey integration
 - **D-Bus service**: headless backend communicates with the extension via `de.jt.Dictate`
+
+## Demo
+
+Try the interactive browser simulation to preview all settings, animations and themes before installing:
+
+**[Open Demo](https://lpritzkow21.github.io/jt-dictate/simulation.html)** *(or open `simulation.html` locally)*
+
+- Left-click the mic icon to start/stop recording
+- Right-click for the context menu
+- Configure everything in Settings (Rechtsklick → Alle Einstellungen)
+- Export your settings as JSON and import them after installation
 
 ## Requirements
 

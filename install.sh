@@ -348,6 +348,20 @@ mkdir -p "$EXTENSION_DIR"
 \cp "$SCRIPT_DIR/extension/stylesheet.css" "$EXTENSION_DIR/"
 \cp "$SCRIPT_DIR/extension/prefs.js" "$EXTENSION_DIR/"
 
+# Sounds kopieren
+if [ -d "$SCRIPT_DIR/extension/sounds" ]; then
+    mkdir -p "$EXTENSION_DIR/sounds"
+    \cp "$SCRIPT_DIR/extension/sounds/"*.wav "$EXTENSION_DIR/sounds/" 2>/dev/null || true
+    echo -e "${GREEN}✓${NC} Sound-Dateien installiert"
+fi
+
+# Icons kopieren
+if [ -d "$SCRIPT_DIR/extension/icons" ]; then
+    mkdir -p "$EXTENSION_DIR/icons"
+    \cp "$SCRIPT_DIR/extension/icons/"*.svg "$EXTENSION_DIR/icons/" 2>/dev/null || true
+    echo -e "${GREEN}✓${NC} Icon-Dateien installiert"
+fi
+
 echo -e "${GREEN}✓${NC} Extension installiert: $EXTENSION_DIR"
 
 # Extension aktivieren

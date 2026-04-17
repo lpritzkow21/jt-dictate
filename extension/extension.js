@@ -41,10 +41,10 @@ const DictateInterfaceXml = `
 const DictateNodeInfo = Gio.DBusNodeInfo.new_for_xml(DictateInterfaceXml);
 const DictateIfaceInfo = DictateNodeInfo.lookup_interface(DBUS_INTERFACE);
 
-// D-Bus Call Timeout in ms — kurz halten damit GNOME Shell nie lange hängt
+// D-Bus Call Timeout in ms
 const DBUS_TIMEOUT_MS = 2000;
 
-// Persistente NotificationSource — wird einmal erstellt und wiederverwendet
+// Persistente NotificationSource
 let _notifySource = null;
 
 function _ensureNotifySource() {
@@ -60,16 +60,13 @@ function _ensureNotifySource() {
     return _notifySource;
 }
 
-// Kompatible Notification-Funktion (Main.notify wurde in GNOME 46 entfernt)
 function _notify(title, body) {
     try {
         if (Main.notify) {
-            // GNOME 45 und älter
             Main.notify(title, body);
             return;
         }
 
-        // GNOME 46+: MessageTray direkt nutzen mit persistenter Source
         let source = _ensureNotifySource();
         let notification = new MessageTray.Notification({
             source,
@@ -93,36 +90,48 @@ const DEFAULT_SETTINGS = {
     pill_width: 200,
     pill_height: 40,
     pill_border_radius: 20,
-    pill_bg_color: 'rgba(0,0,0,0.75)',
-    pill_border_color: 'rgba(255,255,255,0.1)',
+    pill_bg_color: 'rgba(15,15,25,0.82)',
+    pill_border_color: 'rgba(255,255,255,0.12)',
     pill_border_width: 1,
-    pill_blur: 0,
-    pill_shadow_intensity: 0.3,
+    pill_blur: 12,
+    pill_shadow_intensity: 0.4,
     pill_margin_top: 60,
     pill_margin_horizontal: 0,
-    pill_position: 'top-center',
+    pill_position: 'bottom-center',
     visualization_type: 'bars',
-    bar_color_left: '#3584e4',
-    bar_color_right: '#e01b24',
+    bar_color_left: '#6c9ff8',
+    bar_color_right: '#f06292',
     bar_gradient: true,
-    bar_count: 5,
+    bar_count: 15,
     icon_name: 'audio-input-microphone-symbolic',
-    icon_color: '#ffffff',
+    icon_color: '#e8eaed',
     custom_icon_path: '',
-    recording_color: '#e01b24',
-    processing_color: '#e5a50a',
+    recording_color: '#ef5350',
+    processing_color: '#ffa726',
+    spinner_color: '#ffa726',
+    checkmark_color: '#66bb6a',
+    pill_animation: 'minimal',
     active_theme: 'default',
     follow_system_theme: false,
     sound_enabled: true,
-    sound_volume: 0.5,
-    sound_start: 'default',
-    sound_stop: 'default',
+    sound_start_volume: 0.5,
+    sound_stop_volume: 0.5,
+    sound_finish_volume: 0.7,
+    sound_start: 'click',
+    sound_stop: 'click',
+    sound_finish: 'gentle-ping',
+    notifications_enabled: false,
+    processing_position: 'bottom-right',
+    processing_margin_bottom: 28,
+    processing_margin_horizontal: 28,
+    processing_size: 44,
+    pill_display_monitor: 'active',
+    checkmark_effect: 'fade',
 };
 
-// ─── Hilfsfunktionen ───
+// --- Hilfsfunktionen ---
 
 function _parseColorComponents(colorStr) {
-    // Gibt {r, g, b, a} als 0-1 Werte zurück
     if (!colorStr || typeof colorStr !== 'string')
         return {r: 1, g: 1, b: 1, a: 1};
     if (colorStr.startsWith('rgba(')) {
@@ -155,7 +164,7 @@ function _lerpColor(c1, c2, t) {
     };
 }
 
-// ─── Audio-Visualisierungs-Canvas ───
+// --- Audio-Visualisierungs-Canvas ---
 
 const VisualizationCanvas = GObject.registerClass(
 class VisualizationCanvas extends St.DrawingArea {
@@ -182,7 +191,7 @@ class VisualizationCanvas extends St.DrawingArea {
         let [w, h] = [this.get_width(), this.get_height()];
         let s = this._settings;
         let levels = this._levels;
-        if (!levels.length) levels = new Array(s.bar_count).fill(0.05);
+        if (!levels.length) levels = new Array(s.bar_count).fill(0);
 
         let leftColor = _parseColorComponents(s.bar_color_left);
         let rightColor = _parseColorComponents(s.bar_color_right);
@@ -218,15 +227,19 @@ class VisualizationCanvas extends St.DrawingArea {
         let useGradient = this._settings.bar_gradient;
 
         for (let i = 0; i < count; i++) {
-            let level = levels[i] || 0.05;
-            let barH = Math.max(4, level * h);
+            let rawLevel = levels[i] || 0;
+            // Mitte stärker ausschlagen: Gauss-Gewichtung um die Mitte
+            let center = (count - 1) / 2;
+            let dist = Math.abs(i - center) / center; // 0 = Mitte, 1 = Rand
+            let centerWeight = 1.0 - dist * 0.6; // Mitte 1.0, Rand 0.4
+            let level = rawLevel * centerWeight;
+            let barH = Math.max(2, level * h);
             let x = i * (barWidth + gap);
             let y = (h - barH) / 2;
 
             let c = useGradient ? _lerpColor(leftColor, rightColor, i / Math.max(1, count - 1)) : leftColor;
             cr.setSourceRGBA(c.r, c.g, c.b, c.a * 0.9);
 
-            // Abgerundete Ecken
             let radius = Math.min(barWidth / 2, 3);
             cr.newSubPath();
             cr.arc(x + barWidth - radius, y + radius, radius, -Math.PI/2, 0);
@@ -243,10 +256,8 @@ class VisualizationCanvas extends St.DrawingArea {
         let count = Math.max(levels.length, 8);
         let midY = h / 2;
 
-        // Zeichne Segmentweise um Gradient per Segment zu simulieren
         cr.setLineWidth(2.5);
 
-        // Hauptlinie
         let points = [];
         for (let i = 0; i <= count; i++) {
             let t = i / count;
@@ -268,7 +279,6 @@ class VisualizationCanvas extends St.DrawingArea {
             cr.stroke();
         }
 
-        // Spiegelung (schwächer)
         let mirrorPoints = [];
         for (let i = 0; i <= count; i++) {
             let t = i / count;
@@ -298,7 +308,6 @@ class VisualizationCanvas extends St.DrawingArea {
         let cx = w / 2;
         let cy = h / 2;
 
-        // Mehrere Ringe
         for (let ring = 2; ring >= 0; ring--) {
             let scale = 0.3 + avgLevel * 0.7 - ring * 0.15;
             if (scale < 0.1) scale = 0.1;
@@ -320,7 +329,6 @@ class VisualizationCanvas extends St.DrawingArea {
         let count = Math.max(levels.length, 4);
         let useGradient = this._settings.bar_gradient;
 
-        // Zeichne den Kreis als gefüllte Segmente statt Cairo-Gradient
         let segments = 90;
         let angleStep = (2 * Math.PI) / segments;
 
@@ -357,7 +365,6 @@ class VisualizationCanvas extends St.DrawingArea {
         for (let i = 0; i < count; i++) {
             let level = levels[i] || 0.05;
 
-            // Segmentierte Balken
             let totalH = Math.max(4, level * h);
             let segH = 3;
             let segGap = 1;
@@ -381,7 +388,107 @@ class VisualizationCanvas extends St.DrawingArea {
     }
 });
 
-// ─── Recording Pill (Overlay-Widget) ───
+// --- Spinner Canvas (drehender Kreis fuer Processing) ---
+
+const SpinnerCanvas = GObject.registerClass(
+class SpinnerCanvas extends St.DrawingArea {
+    _init(size, color) {
+        super._init({
+            width: size,
+            height: size,
+        });
+        this._size = size;
+        this._color = _parseColorComponents(color || '#ffffff');
+        this._angle = 0;
+        this._spinId = null;
+
+        this.connect('repaint', (area) => this._draw(area));
+    }
+
+    startSpinning() {
+        if (this._spinId) return;
+        this._spinId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 30, () => {
+            this._angle += 0.12;
+            this.queue_repaint();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    stopSpinning() {
+        if (this._spinId) {
+            GLib.source_remove(this._spinId);
+            this._spinId = null;
+        }
+    }
+
+    _draw(area) {
+        let cr = area.get_context();
+        let s = this._size;
+        let cx = s / 2;
+        let cy = s / 2;
+        let radius = s / 2 - 3;
+        let lineWidth = 2.5;
+        let c = this._color;
+
+        cr.setLineWidth(lineWidth);
+        cr.setLineCap(1); // ROUND
+
+        // Hintergrund-Ring (schwach)
+        cr.setSourceRGBA(c.r, c.g, c.b, 0.15);
+        cr.arc(cx, cy, radius, 0, 2 * Math.PI);
+        cr.stroke();
+
+        // Drehender Bogen (3/4 Kreis)
+        cr.setSourceRGBA(c.r, c.g, c.b, 0.9);
+        cr.arc(cx, cy, radius, this._angle, this._angle + 1.5 * Math.PI);
+        cr.stroke();
+
+        cr.$dispose();
+    }
+
+    destroy() {
+        this.stopSpinning();
+        super.destroy();
+    }
+});
+
+// --- Checkmark Canvas ---
+
+const CheckmarkCanvas = GObject.registerClass(
+class CheckmarkCanvas extends St.DrawingArea {
+    _init(size, color) {
+        super._init({
+            width: size,
+            height: size,
+        });
+        this._size = size;
+        this._color = _parseColorComponents(color || '#4ade80');
+
+        this.connect('repaint', (area) => this._draw(area));
+    }
+
+    _draw(area) {
+        let cr = area.get_context();
+        let s = this._size;
+        let c = this._color;
+
+        cr.setLineWidth(2.5);
+        cr.setLineCap(1); // ROUND
+        cr.setLineJoin(1); // ROUND
+        cr.setSourceRGBA(c.r, c.g, c.b, 0.9);
+
+        // Haekchen zeichnen
+        let pad = s * 0.25;
+        cr.moveTo(pad, s * 0.5);
+        cr.lineTo(s * 0.4, s - pad);
+        cr.lineTo(s - pad, pad);
+        cr.stroke();
+
+        cr.$dispose();
+    }
+});
+
+// --- Recording Pill (Overlay-Widget) ---
 
 const RecordingPill = GObject.registerClass(
 class RecordingPill extends St.Widget {
@@ -393,6 +500,8 @@ class RecordingPill extends St.Widget {
         this._settings = settings;
         this._animationId = null;
         this._simLevels = [];
+        this._processingAnimIds = [];
+        this._isAnimatingToProcessing = false;
 
         this._buildUI();
     }
@@ -405,6 +514,8 @@ class RecordingPill extends St.Widget {
             vertical: false,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
+            x_expand: true,
+            y_expand: true,
         });
 
         // Style berechnen
@@ -423,6 +534,18 @@ class RecordingPill extends St.Widget {
             } catch (e) {
                 this._pillIcon.icon_name = 'audio-input-microphone-symbolic';
             }
+        } else if (s.icon_name === 'janeway') {
+            try {
+                let iconPath = this._findJanewayIcon();
+                if (iconPath) {
+                    let gicon = Gio.FileIcon.new(Gio.File.new_for_path(iconPath));
+                    this._pillIcon.set_gicon(gicon);
+                } else {
+                    this._pillIcon.icon_name = 'audio-input-microphone-symbolic';
+                }
+            } catch (e) {
+                this._pillIcon.icon_name = 'audio-input-microphone-symbolic';
+            }
         } else {
             this._pillIcon.icon_name = s.icon_name || 'audio-input-microphone-symbolic';
         }
@@ -434,6 +557,18 @@ class RecordingPill extends St.Widget {
         this._box.add_child(this._canvas);
 
         this.add_child(this._box);
+    }
+
+    _findJanewayIcon() {
+        let candidates = [
+            GLib.build_filenamev([GLib.get_home_dir(), '.local', 'share', 'gnome-shell', 'extensions', 'jt-dictate@jt.tools', 'icons', 'janeway-symbolic.svg']),
+            GLib.build_filenamev(['/usr', 'share', 'gnome-shell', 'extensions', 'jt-dictate@jt.tools', 'icons', 'janeway-symbolic.svg']),
+        ];
+        for (let path of candidates) {
+            if (GLib.file_test(path, GLib.FileTest.EXISTS))
+                return path;
+        }
+        return null;
     }
 
     _applyStyle() {
@@ -449,8 +584,6 @@ class RecordingPill extends St.Widget {
         `;
 
         if (s.pill_shadow_intensity > 0) {
-            // St verwendet -st-shadow statt box-shadow (CSS-Subset)
-            // Format: x-offset y-offset blur spread color
             let shadowAlpha = s.pill_shadow_intensity;
             style += `-st-shadow: 0px 4px 12px 0px rgba(0,0,0,${shadowAlpha});`;
         }
@@ -461,7 +594,6 @@ class RecordingPill extends St.Widget {
     _applySystemTheme() {
         if (!this._settings.follow_system_theme) return;
 
-        // Prüfe ob GNOME dark mode aktiv ist (Settings-Objekt cachen)
         if (!this._interfaceSettings)
             this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         let colorScheme = this._interfaceSettings.get_string('color-scheme');
@@ -480,68 +612,502 @@ class RecordingPill extends St.Widget {
         this._pillIcon.set_style(`color: ${this._settings.icon_color}; margin-right: 8px;`);
     }
 
-    updatePosition() {
+    _getActiveMonitor() {
         let s = this._settings;
-        let monitor = Main.layoutManager.primaryMonitor;
-        if (!monitor) return;
+        if (s.pill_display_monitor === 'primary') {
+            return Main.layoutManager.primaryMonitor;
+        }
+        // 'active': Monitor unter der Maus
+        let [mouseX, mouseY, _mods] = global.get_pointer();
+        let monitors = Main.layoutManager.monitors;
+        for (let m of monitors) {
+            if (mouseX >= m.x && mouseX < m.x + m.width &&
+                mouseY >= m.y && mouseY < m.y + m.height) {
+                return m;
+            }
+        }
+        return Main.layoutManager.primaryMonitor;
+    }
 
+    _getMonitorForPosition(px, py) {
+        // Ermittelt den Monitor anhand einer gegebenen Position (z.B. aktuelle Pill-Position)
+        let monitors = Main.layoutManager.monitors;
+        for (let m of monitors) {
+            if (px >= m.x && px < m.x + m.width &&
+                py >= m.y && py < m.y + m.height) {
+                return m;
+            }
+        }
+        return Main.layoutManager.primaryMonitor;
+    }
+
+    _getPositionForState(state, overrideMonitor) {
+        let s = this._settings;
+        let monitor = overrideMonitor || this._getActiveMonitor();
+        if (!monitor) return {x: 0, y: 0};
+
+        let mx = monitor.x;
+        let my = monitor.y;
+
+        if (state === 'processing') {
+            let size = s.processing_size || 44;
+            let pos = s.processing_position || 'bottom-right';
+            let mb = s.processing_margin_bottom || 28;
+            let mh = s.processing_margin_horizontal || 28;
+            let x, y;
+            switch (pos) {
+            case 'bottom-right':
+                x = mx + monitor.width - size - mh;
+                y = my + monitor.height - size - mb;
+                break;
+            case 'bottom-left':
+                x = mx + mh;
+                y = my + monitor.height - size - mb;
+                break;
+            case 'bottom-center':
+                x = mx + (monitor.width - size) / 2;
+                y = my + monitor.height - size - mb;
+                break;
+            case 'top-right':
+                x = mx + monitor.width - size - mh;
+                y = my + mb + 32;
+                break;
+            case 'top-left':
+                x = mx + mh;
+                y = my + mb + 32;
+                break;
+            case 'top-center':
+                x = mx + (monitor.width - size) / 2;
+                y = my + mb + 32;
+                break;
+            default:
+                x = mx + monitor.width - size - mh;
+                y = my + monitor.height - size - mb;
+                break;
+            }
+            return {x: Math.round(x), y: Math.round(y)};
+        }
+
+        // Normal position (recording)
         let x, y;
-        let pos = s.pill_position || 'top-center';
+        let pos = s.pill_position || 'bottom-center';
 
         switch (pos) {
         case 'top-left':
-            x = s.pill_margin_horizontal;
-            y = s.pill_margin_top;
+            x = mx + s.pill_margin_horizontal;
+            y = my + s.pill_margin_top;
             break;
         case 'top-right':
-            x = monitor.width - s.pill_width - s.pill_margin_horizontal;
-            y = s.pill_margin_top;
+            x = mx + monitor.width - s.pill_width - s.pill_margin_horizontal;
+            y = my + s.pill_margin_top;
             break;
         case 'bottom-center':
-            x = (monitor.width - s.pill_width) / 2 + s.pill_margin_horizontal;
-            y = monitor.height - s.pill_height - s.pill_margin_top;
+            x = mx + (monitor.width - s.pill_width) / 2 + s.pill_margin_horizontal;
+            y = my + monitor.height - s.pill_height - s.pill_margin_top;
             break;
         case 'bottom-left':
-            x = s.pill_margin_horizontal;
-            y = monitor.height - s.pill_height - s.pill_margin_top;
+            x = mx + s.pill_margin_horizontal;
+            y = my + monitor.height - s.pill_height - s.pill_margin_top;
             break;
         case 'bottom-right':
-            x = monitor.width - s.pill_width - s.pill_margin_horizontal;
-            y = monitor.height - s.pill_height - s.pill_margin_top;
+            x = mx + monitor.width - s.pill_width - s.pill_margin_horizontal;
+            y = my + monitor.height - s.pill_height - s.pill_margin_top;
             break;
         default: // top-center
-            x = (monitor.width - s.pill_width) / 2 + s.pill_margin_horizontal;
-            y = s.pill_margin_top;
+            x = mx + (monitor.width - s.pill_width) / 2 + s.pill_margin_horizontal;
+            y = my + s.pill_margin_top;
             break;
         }
 
-        this.set_position(Math.round(x), Math.round(y));
+        return {x: Math.round(x), y: Math.round(y)};
+    }
+
+    updatePosition() {
+        let s = this._settings;
+        let pos = this._getPositionForState('recording');
+        this.set_position(pos.x, pos.y);
         this.set_size(s.pill_width, s.pill_height);
+    }
+
+    // --- Easing-Funktionen (identisch zur Simulation) ---
+    _easeInOutCubic(t) {
+        return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3) / 2;
+    }
+
+    // Manueller Frame-Loop (wie requestAnimationFrame in der Simulation)
+    _animateFrames(durationMs, onFrame, onDone) {
+        let startTime = GLib.get_monotonic_time() / 1000; // ms
+        let id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+            let now = GLib.get_monotonic_time() / 1000;
+            let t = Math.min(1, (now - startTime) / durationMs);
+            onFrame(t);
+            if (t >= 1) {
+                if (onDone) onDone();
+                return GLib.SOURCE_REMOVE;
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
+        this._processingAnimIds.push(id);
+        return id;
     }
 
     show() {
         this._applySystemTheme();
         this.updatePosition();
+        this.opacity = 0;
         super.show();
+
+        let anim = this._settings.pill_animation || 'minimal';
+
+        if (anim === 'smooth') {
+            // Scale 0.85→1.0 + fade (identisch zur Simulation)
+            this.set_pivot_point(0.5, 0.5);
+            this.set_scale(0.85, 0.85);
+            this._animateFrames(300, (t) => {
+                let et = 1 - Math.pow(1 - t, 2); // easeOutQuad
+                this.opacity = Math.round(et * 255);
+                let sc = 0.85 + 0.15 * et;
+                this.set_scale(sc, sc);
+            }, () => {
+                this.set_scale(1, 1);
+                this.opacity = 255;
+            });
+        } else if (anim === 'bounce') {
+            // Snap in von unten — 4-Phasen identisch zur Simulation
+            let pos = this._getPositionForState('recording');
+            let startY = pos.y + 100;
+            this.set_position(pos.x, startY);
+            this.opacity = 255;
+            this.set_pivot_point(0.5, 0.5);
+            this.set_scale(0.9, 0.9);
+
+            this._animateFrames(350, (t) => {
+                let cy, sc;
+                if (t < 0.4) {
+                    let s = t / 0.4;
+                    let e = 1 - Math.pow(1 - s, 3);
+                    cy = startY + ((pos.y - 18) - startY) * e;
+                    sc = 0.9 + 0.15 * e;
+                } else if (t < 0.65) {
+                    let s = (t - 0.4) / 0.25;
+                    cy = (pos.y - 18) + (18 + 6) * s;
+                    sc = 1.05 - 0.05 * s;
+                } else if (t < 0.85) {
+                    let s = (t - 0.65) / 0.2;
+                    cy = (pos.y + 6) - (6 + 3) * s;
+                    sc = 1.0 + 0.02 * Math.sin(s * Math.PI);
+                } else {
+                    let s = (t - 0.85) / 0.15;
+                    cy = (pos.y - 3) + 3 * s;
+                    sc = 1.0;
+                }
+                this.set_position(pos.x, Math.round(cy));
+                this.set_scale(sc, sc);
+            }, () => {
+                this.set_position(pos.x, pos.y);
+                this.set_scale(1, 1);
+            });
+        } else {
+            // Minimal: einfaches Fade
+            this._animateFrames(300, (t) => {
+                this.opacity = Math.round(t * 255);
+            }, () => {
+                this.opacity = 255;
+            });
+        }
+
         this._startAnimation();
     }
 
     hide() {
         this._stopAnimation();
+        this._cleanupProcessingWidgets();
         super.hide();
     }
 
     setProcessing() {
+        if (this._isAnimatingToProcessing) return;
+        this._isAnimatingToProcessing = true;
+
         let s = this._settings;
-        this._pillIcon.set_style(`color: ${s.processing_color}; margin-right: 8px;`);
-        if (s.icon_name === 'custom' && s.custom_icon_path) {
-            // Keep custom icon
-        } else {
-            this._pillIcon.icon_name = 'emblem-synchronizing-symbolic';
-        }
-        // Animation stoppen — es wird kein Audio mehr aufgenommen
+        let anim = s.pill_animation || 'minimal';
+        let circleSize = s.processing_size || 44;
+        // Monitor anhand der aktuellen Pill-Position ermitteln, nicht Mausposition
+        let currentMonitor = this._getMonitorForPosition(this.x, this.y);
+        let targetPos = this._getPositionForState('processing', currentMonitor);
+
         this._stopAnimation();
-        this._canvas.setLevels(new Array(s.bar_count).fill(0.05));
+        // Alle laufenden Animationen (z.B. show-Fade) stoppen,
+        // damit sie nicht mit der Morph-Animation kollidieren
+        this._cancelRunningAnimations();
+
+        // Spinner vorbereiten (wird während Morph eingeblendet)
+        let spinSize = Math.max(16, circleSize - 12);
+        this._spinner = new SpinnerCanvas(spinSize, s.spinner_color || s.processing_color || '#ffa726');
+        this._spinner.opacity = 0;
+        this._spinner.set_x_align(Clutter.ActorAlign.CENTER);
+        this._spinner.set_y_align(Clutter.ActorAlign.CENTER);
+        this._spinner.set_x_expand(true);
+        this._spinner.set_y_expand(true);
+
+        // Start-Werte
+        let startX = this.x;
+        let startY = this.y;
+        let startW = s.pill_width;
+        let startH = s.pill_height;
+        let startBR = s.pill_border_radius;
+        let endBR = circleSize / 2;
+
+        if (anim === 'smooth') {
+            // Alles in einem Loop: Icon/Viz fade + Morph + Slide + Spinner fade-in
+            let morphDur = 700;
+            let spinnerAdded = false;
+
+            this._animateFrames(morphDur, (t) => {
+                let et = this._easeInOutCubic(t);
+
+                // Position + Groesse morphen
+                let cx = startX + (targetPos.x - startX) * et;
+                let cy = startY + (targetPos.y - startY) * et;
+                let cw = startW + (circleSize - startW) * et;
+                let ch = startH + (circleSize - startH) * et;
+                let cbr = startBR + (endBR - startBR) * et;
+
+                this.set_position(Math.round(cx), Math.round(cy));
+                this.set_size(Math.round(cw), Math.round(ch));
+
+                let style = `width:${Math.round(cw)}px;height:${Math.round(ch)}px;border-radius:${Math.round(cbr)}px;background-color:${s.pill_bg_color};border:${s.pill_border_width}px solid ${s.pill_border_color};padding:0px;`;
+                if (s.pill_shadow_intensity > 0)
+                    style += `-st-shadow:0px 4px 12px 0px rgba(0,0,0,${s.pill_shadow_intensity});`;
+                this._box.set_style(style);
+
+                // Icon/Viz: fade in ersten 35%
+                let iconOp = Math.max(0, 1 - t / 0.35);
+                this._pillIcon.opacity = Math.round(iconOp * 255);
+                this._canvas.opacity = Math.round(iconOp * 255);
+                if (t >= 0.35) {
+                    this._pillIcon.visible = false;
+                    this._canvas.visible = false;
+                }
+
+                // Spinner: einblenden ab 25%
+                if (t >= 0.2 && !spinnerAdded) {
+                    this._box.add_child(this._spinner);
+                    this._spinner.startSpinning();
+                    spinnerAdded = true;
+                }
+                if (spinnerAdded) {
+                    let spinOp = Math.max(0, Math.min(1, (t - 0.25) / 0.35));
+                    this._spinner.opacity = Math.round(spinOp * 255);
+                }
+            }, () => {
+                if (!spinnerAdded) {
+                    this._box.add_child(this._spinner);
+                    this._spinner.startSpinning();
+                }
+                this._spinner.opacity = 255;
+            });
+
+        } else if (anim === 'bounce') {
+            // Bounce: alles in einem Loop mit front-loaded size morph
+            let morphDur = 650;
+            let spinnerAdded = false;
+
+            // Size-Easing: aggressiv front-loaded
+            const sizeEase = (t) => {
+                let s2 = Math.min(1, t / 0.35);
+                return 1 - Math.pow(1 - s2, 5);
+            };
+            // Position: easeOutQuart, kein Overshoot
+            const posEase = (t) => 1 - Math.pow(1 - t, 4);
+
+            // Clamp position zum aktuellen Monitor
+            let maxX = currentMonitor ? currentMonitor.x + currentMonitor.width - circleSize - 8 : targetPos.x;
+            let maxY = currentMonitor ? currentMonitor.y + currentMonitor.height - circleSize - 8 : targetPos.y;
+            let endX = Math.min(targetPos.x, maxX);
+            let endY = Math.min(targetPos.y, maxY);
+
+            this._animateFrames(morphDur, (t) => {
+                let st = sizeEase(t);
+                let pt = posEase(t);
+
+                let cw = startW + (circleSize - startW) * st;
+                let ch = startH + (circleSize - startH) * st;
+                let cbr = startBR + (endBR - startBR) * st;
+
+                this.set_position(
+                    Math.round(startX + (endX - startX) * pt),
+                    Math.round(startY + (endY - startY) * pt)
+                );
+                this.set_size(Math.round(cw), Math.round(ch));
+
+                let style = `width:${Math.round(cw)}px;height:${Math.round(ch)}px;border-radius:${Math.round(cbr)}px;background-color:${s.pill_bg_color};border:${s.pill_border_width}px solid ${s.pill_border_color};padding:0px;`;
+                if (s.pill_shadow_intensity > 0)
+                    style += `-st-shadow:0px 4px 12px 0px rgba(0,0,0,${s.pill_shadow_intensity});`;
+                this._box.set_style(style);
+
+                // Icon/Viz: fade in ersten 25%
+                let iconOp = Math.max(0, 1 - t / 0.25);
+                this._pillIcon.opacity = Math.round(iconOp * 255);
+                this._canvas.opacity = Math.round(iconOp * 255);
+                if (t >= 0.25) {
+                    this._pillIcon.visible = false;
+                    this._canvas.visible = false;
+                }
+
+                // Spinner ab 15%
+                if (t >= 0.15 && !spinnerAdded) {
+                    this._box.add_child(this._spinner);
+                    this._spinner.startSpinning();
+                    spinnerAdded = true;
+                }
+                if (spinnerAdded) {
+                    let spinOp = Math.max(0, Math.min(1, (t - 0.15) / 0.35));
+                    this._spinner.opacity = Math.round(spinOp * 255);
+                }
+
+                // Subtle scale bounce am Ende
+                if (t > 0.7) {
+                    let bt = (t - 0.7) / 0.3;
+                    let sc = 1 + 0.04 * Math.sin(bt * Math.PI * 2) * (1 - bt);
+                    this.set_pivot_point(0.5, 0.5);
+                    this.set_scale(sc, sc);
+                }
+            }, () => {
+                this.set_scale(1, 1);
+                if (!spinnerAdded) {
+                    this._box.add_child(this._spinner);
+                    this._spinner.startSpinning();
+                }
+                this._spinner.opacity = 255;
+            });
+
+        } else {
+            // Minimal: In-place crossfade morph, kein Slide
+            let origCenterX = startX + startW / 2;
+            let origCenterY = startY + startH / 2;
+            let morphDur = 500;
+            let spinnerAdded = false;
+
+            this._animateFrames(morphDur, (t) => {
+                let et = this._easeInOutCubic(t);
+
+                let cw = startW + (circleSize - startW) * et;
+                let ch = startH + (circleSize - startH) * et;
+                let cbr = startBR + (endBR - startBR) * et;
+
+                this.set_position(
+                    Math.round(origCenterX - cw / 2),
+                    Math.round(origCenterY - ch / 2)
+                );
+                this.set_size(Math.round(cw), Math.round(ch));
+
+                let style = `width:${Math.round(cw)}px;height:${Math.round(ch)}px;border-radius:${Math.round(cbr)}px;background-color:${s.pill_bg_color};border:${s.pill_border_width}px solid ${s.pill_border_color};padding:0px;`;
+                if (s.pill_shadow_intensity > 0)
+                    style += `-st-shadow:0px 4px 12px 0px rgba(0,0,0,${s.pill_shadow_intensity});`;
+                this._box.set_style(style);
+
+                // Icon/Viz fade
+                this._pillIcon.opacity = Math.round(Math.max(0, 1 - et) * 255);
+                this._canvas.opacity = Math.round(Math.max(0, 1 - et) * 255);
+                if (et >= 0.5) {
+                    this._pillIcon.visible = false;
+                    this._canvas.visible = false;
+                }
+
+                // Spinner ab 40%
+                if (t >= 0.4 && !spinnerAdded) {
+                    this._box.add_child(this._spinner);
+                    this._spinner.startSpinning();
+                    spinnerAdded = true;
+                }
+                if (spinnerAdded) {
+                    let spinOp = Math.max(0, Math.min(1, (t - 0.4) / 0.5));
+                    this._spinner.opacity = Math.round(spinOp * 255);
+                }
+            }, () => {
+                if (!spinnerAdded) {
+                    this._box.add_child(this._spinner);
+                    this._spinner.startSpinning();
+                }
+                this._spinner.opacity = 255;
+            });
+        }
+    }
+
+    setDone() {
+        let s = this._settings;
+        let anim = s.pill_animation || 'minimal';
+        let circleSize = s.processing_size || 44;
+
+        // Spinner→Haekchen Crossfade (identisch zur Simulation: in-place, scale 0.7→1.0)
+        let checkSize = Math.max(16, circleSize - 12);
+        this._checkmark = new CheckmarkCanvas(checkSize, s.checkmark_color || '#66bb6a');
+        this._checkmark.opacity = 0;
+        this._checkmark.set_x_align(Clutter.ActorAlign.CENTER);
+        this._checkmark.set_y_align(Clutter.ActorAlign.CENTER);
+        this._checkmark.set_x_expand(true);
+        this._checkmark.set_y_expand(true);
+        this._checkmark.set_pivot_point(0.5, 0.5);
+        let useZoom = s.checkmark_effect === 'zoom';
+        this._checkmark.set_scale(useZoom ? 0.0 : 1.0, useZoom ? 0.0 : 1.0);
+        this._box.add_child(this._checkmark);
+        this._checkmark.queue_repaint();
+
+        // Crossfade: Spinner out + Checkmark in (300ms)
+        this._animateFrames(300, (t) => {
+            let et = this._easeInOutCubic(t);
+            if (this._spinner)
+                this._spinner.opacity = Math.round((1 - et) * 255);
+            this._checkmark.opacity = Math.round(et * 255);
+            if (useZoom) {
+                this._checkmark.set_scale(et, et);
+            }
+        }, () => {
+            if (this._spinner) {
+                this._spinner.stopSpinning();
+                try { this._box.remove_child(this._spinner); } catch (e) { /* */ }
+                this._spinner.destroy();
+                this._spinner = null;
+            }
+            this._checkmark.opacity = 255;
+            if (useZoom) this._checkmark.set_scale(1, 1);
+
+            // Exit-Animation nach 800ms (je nach Stil)
+            let fadeId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {
+                if (anim === 'smooth') {
+                    this.set_pivot_point(0.5, 0.5);
+                    this._animateFrames(450, (t) => {
+                        this.opacity = Math.round((1 - t) * 255);
+                        let sc = 1.0 - 0.15 * t;
+                        this.set_scale(sc, sc);
+                    }, () => this._requestDestroy());
+                } else if (anim === 'bounce') {
+                    let startY = this.y;
+                    this._animateFrames(500, (t) => {
+                        let et = this._easeInOutCubic(t);
+                        this.set_position(this.x, Math.round(startY + 60 * et));
+                        this.opacity = Math.round((1 - et) * 255);
+                    }, () => this._requestDestroy());
+                } else {
+                    this._animateFrames(400, (t) => {
+                        this.opacity = Math.round((1 - t) * 255);
+                    }, () => this._requestDestroy());
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+            this._processingAnimIds.push(fadeId);
+        });
+    }
+
+    _requestDestroy() {
+        // Signal an den Indicator dass die Pill fertig ist
+        if (this._onDoneCallback)
+            this._onDoneCallback();
+    }
+
+    setOnDone(callback) {
+        this._onDoneCallback = callback;
     }
 
     setRecording() {
@@ -555,11 +1121,9 @@ class RecordingPill extends St.Widget {
     }
 
     setRealLevels(levels) {
-        // Echte Audio-Levels vom Backend empfangen
         this._hasRealLevels = true;
         this._lastRealLevelTime = GLib.get_monotonic_time();
 
-        // Resample auf bar_count wenn nötig
         let count = this._settings.bar_count;
         let resampled;
         if (levels.length === count) {
@@ -575,7 +1139,6 @@ class RecordingPill extends St.Widget {
             }
         }
 
-        // Smoothing
         if (this._prevLevels && this._prevLevels.length === count) {
             for (let i = 0; i < count; i++)
                 resampled[i] = this._prevLevels[i] * 0.25 + resampled[i] * 0.75;
@@ -587,28 +1150,30 @@ class RecordingPill extends St.Widget {
     _startAnimation() {
         if (this._animationId) return;
         this._hasRealLevels = false;
+        this._lastMonitorIdx = -1;
 
         this._animationId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60, () => {
-            // Wenn echte Levels vom Backend kommen, nichts simulieren
+            // Bei 'active' Monitor: Position aktualisieren wenn Maus den Bildschirm wechselt
+            if (this._settings.pill_display_monitor === 'active' && !this._isAnimatingToProcessing) {
+                let newMonitor = this._getActiveMonitor();
+                let monIdx = newMonitor ? Main.layoutManager.monitors.indexOf(newMonitor) : -1;
+                if (monIdx !== this._lastMonitorIdx) {
+                    this._lastMonitorIdx = monIdx;
+                    this.updatePosition();
+                }
+            }
+
             if (this._hasRealLevels) {
-                // Prüfe ob Levels noch frisch sind (< 500ms alt)
                 let now = GLib.get_monotonic_time();
                 if (now - (this._lastRealLevelTime || 0) < 500000)
                     return GLib.SOURCE_CONTINUE;
-                // Fallback auf Simulation wenn Backend keine Levels mehr sendet
                 this._hasRealLevels = false;
             }
 
-            // Fallback: simulierte Levels (z.B. wenn Backend-Version zu alt)
             let count = this._settings.bar_count;
-            this._simLevels = Array.from({length: count}, () =>
-                0.1 + Math.random() * 0.8
-            );
+            // Idle: alle Balken auf Minimum, kein Ausschlag ohne Sprache
+            this._simLevels = new Array(count).fill(0);
 
-            if (this._prevLevels && this._prevLevels.length === count) {
-                for (let i = 0; i < count; i++)
-                    this._simLevels[i] = this._prevLevels[i] * 0.3 + this._simLevels[i] * 0.7;
-            }
             this._prevLevels = [...this._simLevels];
             this._canvas.setLevels(this._simLevels);
             return GLib.SOURCE_CONTINUE;
@@ -622,14 +1187,38 @@ class RecordingPill extends St.Widget {
         }
     }
 
+    _cancelRunningAnimations() {
+        for (let id of this._processingAnimIds) {
+            try { GLib.source_remove(id); } catch (e) { /* already fired */ }
+        }
+        this._processingAnimIds = [];
+    }
+
+    _cleanupProcessingWidgets() {
+        this._cancelRunningAnimations();
+
+        if (this._spinner) {
+            this._spinner.stopSpinning();
+            try { this._box.remove_child(this._spinner); } catch (e) { /* */ }
+            this._spinner.destroy();
+            this._spinner = null;
+        }
+        if (this._checkmark) {
+            try { this._box.remove_child(this._checkmark); } catch (e) { /* */ }
+            this._checkmark.destroy();
+            this._checkmark = null;
+        }
+    }
+
     destroy() {
         this._stopAnimation();
+        this._cleanupProcessingWidgets();
         super.destroy();
     }
 });
 
 
-// ─── Panel Indicator ───
+// --- Panel Indicator ---
 
 const DictateIndicator = GObject.registerClass(
 class DictateIndicator extends PanelMenu.Button {
@@ -654,16 +1243,16 @@ class DictateIndicator extends PanelMenu.Button {
         });
         this.add_child(this._icon);
 
-        // Menü (für Rechtsklick)
+        // Menu (Rechtsklick)
         this._buildMenu();
 
-        // Recording Pill erstellen (wird erst bei Aufnahme sichtbar)
+        // Recording Pill
         this._pill = null;
 
-        // D-Bus Proxy erstellen
-        this._connectProxy();
+        // D-Bus Proxy
+        this._connectProxyOrStartBackend();
 
-        // Status regelmäßig prüfen
+        // Status-Check
         this._startStatusCheck();
     }
 
@@ -680,8 +1269,14 @@ class DictateIndicator extends PanelMenu.Button {
         }
     }
 
+    _maybeNotify(title, body) {
+        // Nur GNOME-Notification anzeigen wenn aktiviert
+        if (this._settings.notifications_enabled) {
+            _notify(title, body);
+        }
+    }
+
     _ensurePill() {
-        // Settings neu laden für aktuelle Werte
         this._loadSettingsSync();
 
         if (this._pill) {
@@ -691,13 +1286,35 @@ class DictateIndicator extends PanelMenu.Button {
         }
 
         this._pill = new RecordingPill(this._settings);
-        Main.layoutManager.addTopChrome(this._pill);
+        this._pill.setOnDone(() => {
+            this._destroyPill();
+        });
+        Main.layoutManager.addChrome(this._pill, {
+            affectsInputRegion: false,
+            affectsStruts: false,
+            trackFullscreen: false,
+        });
+    }
+
+    _destroyPill() {
+        if (this._pill) {
+            try {
+                Main.layoutManager.removeChrome(this._pill);
+            } catch (e) {
+                // Fallback: direkt vom Parent entfernen
+                try {
+                    let parent = this._pill.get_parent();
+                    if (parent) parent.remove_child(this._pill);
+                } catch (e2) { /* already removed */ }
+            }
+            this._pill.destroy();
+            this._pill = null;
+        }
     }
 
     _connectProxy() {
         if (this._destroyed) return;
 
-        // Alten Signal-Handler aufräumen
         if (this._signalId && this._proxy) {
             this._proxy.disconnect(this._signalId);
             this._signalId = null;
@@ -724,7 +1341,6 @@ class DictateIndicator extends PanelMenu.Button {
                         this._proxyReady = true;
                         this._backendStarting = false;
 
-                        // D-Bus Signals empfangen
                         this._signalId = this._proxy.connect('g-signal', (p, sender, signalName, params) => {
                             if (this._destroyed) return;
                             if (signalName === 'AudioLevels' && this._pill) {
@@ -742,10 +1358,22 @@ class DictateIndicator extends PanelMenu.Button {
                         });
                     }
                 } catch (e) {
-                    // Proxy-Erstellung fehlgeschlagen
+                    // Proxy creation failed
                 }
             }
         );
+    }
+
+    _connectProxyOrStartBackend() {
+        if (this._destroyed) return;
+        this._isBackendOnBus((onBus) => {
+            if (this._destroyed) return;
+            if (onBus) {
+                this._connectProxy();
+            } else {
+                this._startBackend();
+            }
+        });
     }
 
     _ensureProxy() {
@@ -776,6 +1404,14 @@ class DictateIndicator extends PanelMenu.Button {
         });
         settingsMenu.menu.addMenuItem(this._autoClipboardItem);
 
+        // Benachrichtigungen
+        this._notificationsItem = new PopupMenu.PopupSwitchMenuItem('GNOME-Benachrichtigungen', false);
+        this._notificationsItem.connect('toggled', (item) => {
+            this._setSetting('notifications_enabled', item.state);
+            this._settings.notifications_enabled = item.state;
+        });
+        settingsMenu.menu.addMenuItem(this._notificationsItem);
+
         settingsMenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         // Modell-Auswahl
@@ -793,7 +1429,6 @@ class DictateIndicator extends PanelMenu.Button {
 
         settingsMenu.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Einstellungen öffnen
         let prefsItem = new PopupMenu.PopupMenuItem('Alle Einstellungen...');
         prefsItem.connect('activate', () => {
             this._extension.openPreferences();
@@ -830,10 +1465,11 @@ class DictateIndicator extends PanelMenu.Button {
                     let settings = JSON.parse(new TextDecoder().decode(contents));
                     this._settings = Object.assign({}, DEFAULT_SETTINGS, settings);
                     this._autoClipboardItem.setToggleState(this._settings.auto_clipboard ?? true);
+                    this._notificationsItem.setToggleState(this._settings.notifications_enabled ?? false);
                     this._markModel(this._settings.model ?? 'base');
                 }
             } catch (e) {
-                // Datei existiert nicht oder ist ungültig — defaults beibehalten
+                // File doesn't exist
             }
         });
     }
@@ -856,7 +1492,7 @@ class DictateIndicator extends PanelMenu.Button {
                 if (success)
                     settings = JSON.parse(new TextDecoder().decode(contents));
             } catch (e) {
-                // File doesn't exist yet, start fresh
+                // File doesn't exist yet
             }
 
             Object.assign(settings, this._settingsCache);
@@ -879,7 +1515,7 @@ class DictateIndicator extends PanelMenu.Button {
     _setModel(model) {
         this._setSetting('model', model);
         this._markModel(model);
-        _notify('JT Dictate', `Modell '${model}' wird beim nächsten Start geladen`);
+        this._maybeNotify('JT Dictate', `Modell '${model}' wird beim nächsten Start geladen`);
     }
 
     _isBackendOnBus(callback) {
@@ -920,7 +1556,7 @@ class DictateIndicator extends PanelMenu.Button {
 
             try {
                 GLib.spawn_command_line_async('nice -n 10 jt-dictate');
-                _notify('JT Dictate', 'Backend wird gestartet...');
+                this._maybeNotify('JT Dictate', 'Backend wird gestartet...');
 
                 let attempts = 0;
                 const tryConnect = () => {
@@ -939,7 +1575,7 @@ class DictateIndicator extends PanelMenu.Button {
                             this._reconnectIds.push(id);
                         } else {
                             this._backendStarting = false;
-                            _notify('JT Dictate', 'Backend konnte nicht gestartet werden.');
+                            this._maybeNotify('JT Dictate', 'Backend konnte nicht gestartet werden.');
                         }
                     });
                     return GLib.SOURCE_REMOVE;
@@ -949,7 +1585,7 @@ class DictateIndicator extends PanelMenu.Button {
                 this._reconnectIds.push(id);
             } catch (e) {
                 this._backendStarting = false;
-                _notify('JT Dictate', `Fehler beim Starten: ${e.message}`);
+                this._maybeNotify('JT Dictate', `Fehler beim Starten: ${e.message}`);
             }
         });
     }
@@ -958,7 +1594,7 @@ class DictateIndicator extends PanelMenu.Button {
         if (this._toggleInFlight) return;
 
         if (!this._proxyReady) {
-            _notify('JT Dictate', 'Backend nicht erreichbar. Starte Backend...');
+            this._maybeNotify('JT Dictate', 'Backend nicht erreichbar. Starte Backend...');
             this._startBackend();
             return;
         }
@@ -984,7 +1620,7 @@ class DictateIndicator extends PanelMenu.Button {
                     this._updateStatus();
                 } catch (e) {
                     this._setRecordingState(false);
-                    _notify('JT Dictate', 'Backend nicht erreichbar. Starte Backend...');
+                    this._maybeNotify('JT Dictate', 'Backend nicht erreichbar. Starte Backend...');
                     this._proxyReady = false;
                     this._proxy = null;
                     this._startBackend();
@@ -1028,7 +1664,15 @@ class DictateIndicator extends PanelMenu.Button {
                     } else if (status === 'processing') {
                         this._setProcessingState();
                     } else {
-                        this._setRecordingState(false);
+                        // idle — wenn vorher processing war, done-Animation abspielen
+                        if (this._wasProcessing && this._pill) {
+                            this._wasProcessing = false;
+                            this._pill.setDone();
+                            // Pill wird sich selbst zerstoeren via onDone callback
+                            this._setIdleStateWithoutPillDestroy();
+                        } else {
+                            this._setRecordingState(false);
+                        }
                     }
                 } catch (e) {
                     this._setRecordingState(false);
@@ -1040,12 +1684,23 @@ class DictateIndicator extends PanelMenu.Button {
         );
     }
 
+    _setIdleStateWithoutPillDestroy() {
+        if (this._destroyed) return;
+        this._isRecording = false;
+        this._icon.remove_style_class_name('recording');
+        this._icon.remove_style_class_name('processing');
+        this._icon.icon_name = 'audio-input-microphone-symbolic';
+        this._toggleItem.label.text = 'Aufnahme starten';
+        this._statusItem.label.text = 'Bereit';
+        // Pill bleibt fuer die done-Animation bestehen
+    }
+
     _setRecordingState(recording) {
         if (this._destroyed) return;
 
         this._isRecording = recording;
+        this._wasProcessing = false;
 
-        // Panel-Icon State-Klassen
         this._icon.remove_style_class_name('recording');
         this._icon.remove_style_class_name('processing');
 
@@ -1055,7 +1710,7 @@ class DictateIndicator extends PanelMenu.Button {
             this._toggleItem.label.text = 'Aufnahme stoppen';
             this._statusItem.label.text = 'Aufnahme läuft...';
 
-            // Pill anzeigen (nur erstellen wenn noch nicht vorhanden)
+            // Pill anzeigen — immer, egal ob Mausklick oder Tastenkuerzel
             if (!this._pill) {
                 this._ensurePill();
             }
@@ -1069,13 +1724,7 @@ class DictateIndicator extends PanelMenu.Button {
             this._toggleItem.label.text = 'Aufnahme starten';
             this._statusItem.label.text = 'Bereit';
 
-            // Pill zerstören (nächstes Recording erstellt neue mit aktuellen Settings)
-            if (this._pill) {
-                this._pill.hide();
-                try { Main.layoutManager.removeChrome(this._pill); } catch (e) { /* already removed */ }
-                this._pill.destroy();
-                this._pill = null;
-            }
+            this._destroyPill();
         }
     }
 
@@ -1083,6 +1732,7 @@ class DictateIndicator extends PanelMenu.Button {
         if (this._destroyed) return;
 
         this._isRecording = false;
+        this._wasProcessing = true;
 
         this._icon.remove_style_class_name('recording');
         this._icon.add_style_class_name('processing');
@@ -1090,14 +1740,19 @@ class DictateIndicator extends PanelMenu.Button {
         this._toggleItem.label.text = 'Verarbeitung läuft...';
         this._statusItem.label.text = 'Text wird verarbeitet...';
 
-        // Pill in Processing-Modus (erstellen falls noch nicht vorhanden)
+        // Pill in Processing-Modus (mit Animation)
         if (!this._pill) {
             this._ensurePill();
+            if (this._pill) {
+                // Pill direkt sichtbar machen ohne Fade-Animation,
+                // da setProcessing() sofort die Morph-Animation uebernimmt
+                this._pill.opacity = 255;
+                this._pill.visible = true;
+                this._pill.updatePosition();
+            }
         }
         if (this._pill) {
             this._pill.setProcessing();
-            if (!this._pill.visible)
-                this._pill.show();
         }
     }
 
@@ -1110,10 +1765,8 @@ class DictateIndicator extends PanelMenu.Button {
         this._icon.add_style_class_name('processing');
         this._icon.icon_name = 'emblem-synchronizing-symbolic';
 
-        // Fortschrittsanzeige im Menü
         let progressText;
         if (progress >= 1.0) {
-            // Modell fertig geladen — Status wird beim nächsten Poll aktualisiert
             progressText = 'Modell geladen!';
         } else if (progress >= 0) {
             let pct = Math.round(progress * 100);
@@ -1127,11 +1780,22 @@ class DictateIndicator extends PanelMenu.Button {
     }
 
     _startStatusCheck() {
+        this._reconnectCounter = 0;
         this._statusCheckId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
             if (this._destroyed) return GLib.SOURCE_REMOVE;
+
             if (this._proxyReady || this._backendStarting) {
+                this._reconnectCounter = 0;
                 this._updateStatus();
+            } else {
+                // Proxy nicht ready und Backend startet nicht —
+                // trotzdem regelmaeßig pruefen ob das Backend inzwischen laeuft
+                this._reconnectCounter++;
+                if (this._reconnectCounter % 5 === 0) {
+                    this._updateStatus();
+                }
             }
+
             return GLib.SOURCE_CONTINUE;
         });
     }
@@ -1151,7 +1815,7 @@ class DictateIndicator extends PanelMenu.Button {
         this._reconnectIds = [];
     }
 
-    // Linksklick = Aufnahme toggle, Rechtsklick = Menü toggle
+    // Linksklick = Aufnahme toggle, Rechtsklick = Menu toggle
     vfunc_event(event) {
         let type = event.type();
 
@@ -1171,7 +1835,6 @@ class DictateIndicator extends PanelMenu.Button {
                     return Clutter.EVENT_STOP;
                 }
 
-                // Mittlere Maustaste etc. durchlassen
                 return Clutter.EVENT_PROPAGATE;
             }
 
@@ -1189,11 +1852,7 @@ class DictateIndicator extends PanelMenu.Button {
             this._proxy.disconnect(this._signalId);
             this._signalId = null;
         }
-        if (this._pill) {
-            try { Main.layoutManager.removeChrome(this._pill); } catch (e) { /* already removed */ }
-            this._pill.destroy();
-            this._pill = null;
-        }
+        this._destroyPill();
         super.destroy();
     }
 });

@@ -45,10 +45,20 @@ DEFAULT_SETTINGS = {
     "model": "base",
     "language": None,
     "sound_enabled": True,
-    "sound_volume": 0.5,
-    "sound_start": "default",
-    "sound_stop": "default",
+    "sound_start_volume": 0.5,
+    "sound_stop_volume": 0.5,
+    "sound_finish_volume": 0.7,
+    "sound_start": "click",
+    "sound_stop": "click",
+    "sound_finish": "gentle-ping",
+    "notifications_enabled": False,
 }
+
+# Pfad zu den Built-in Sounds der Extension
+SOUNDS_DIRS = [
+    os.path.expanduser("~/.local/share/gnome-shell/extensions/jt-dictate@jt.tools/sounds"),
+    "/usr/share/gnome-shell/extensions/jt-dictate@jt.tools/sounds",
+]
 
 
 class Settings:
@@ -459,10 +469,12 @@ class JtDictate:
                 if self.settings.get("auto_clipboard"):
                     self.copy_to_clipboard(final_text)
 
+                self._play_sound("finish")
                 preview = final_text[:80] + "..." if len(final_text) > 80 else final_text
                 GLib.idle_add(self.show_notification, "Fertig!", preview)
                 print(f"\n=== Vollständiger Text ===\n{final_text}\n")
             else:
+                self._play_sound("finish")
                 GLib.idle_add(self.show_notification, "Hinweis", "Kein Text erkannt")
         finally:
             self.is_processing = False
@@ -479,37 +491,71 @@ class JtDictate:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
 
+    def _find_sounds_dir(self):
+        """Findet den Ordner mit den Built-in Sounds."""
+        for d in SOUNDS_DIRS:
+            if os.path.isdir(d):
+                return d
+        return None
+
+    def _resolve_sound_path(self, sound_setting):
+        """Löst eine Sound-Einstellung in einen Dateipfad auf."""
+        if not sound_setting or sound_setting == "none":
+            return None
+
+        # builtin:xxx Format
+        if sound_setting.startswith("builtin:"):
+            sound_id = sound_setting.split(":", 1)[1]
+            sounds_dir = self._find_sounds_dir()
+            if sounds_dir:
+                path = os.path.join(sounds_dir, f"{sound_id}.wav")
+                if os.path.isfile(path):
+                    return path
+            return None
+
+        # Direkter Dateipfad
+        if os.path.isfile(sound_setting):
+            return sound_setting
+
+        # Legacy 'default' → verwende gentle-ping als Fallback
+        if sound_setting == "default":
+            sounds_dir = self._find_sounds_dir()
+            if sounds_dir:
+                path = os.path.join(sounds_dir, "gentle-ping.wav")
+                if os.path.isfile(path):
+                    return path
+            return None
+
+        # Bare name (z.B. 'click', 'gentle-ping') → als Built-in Sound behandeln
+        sounds_dir = self._find_sounds_dir()
+        if sounds_dir:
+            path = os.path.join(sounds_dir, f"{sound_setting}.wav")
+            if os.path.isfile(path):
+                return path
+
+        return None
+
     def _play_sound(self, sound_type):
-        """Spielt einen Start/Stop-Sound ab."""
+        """Spielt einen Start/Stop/Finish-Sound ab."""
         try:
             if not self.settings.get("sound_enabled"):
                 return
-            volume = self.settings.get("sound_volume")
+            # Per-sound volume with backwards compatibility
+            volume = self.settings.get(f"sound_{sound_type}_volume")
+            if volume is None:
+                volume = self.settings.get("sound_volume")
+            if volume is None:
+                volume = 0.5
             if volume <= 0:
                 return
 
             sound_setting = self.settings.get(f"sound_{sound_type}")
-            if sound_setting == "none":
+            sound_file = self._resolve_sound_path(sound_setting)
+
+            if not sound_file:
                 return
 
-            if sound_setting and sound_setting != "default" and os.path.isfile(sound_setting):
-                # Eigene Sound-Datei
-                sound_file = sound_setting
-            else:
-                # System-Sound verwenden
-                if sound_type == "start":
-                    sound_id = "bell"
-                else:
-                    sound_id = "complete"
-                # Versuche canberra-gtk-play (Standard auf GNOME)
-                subprocess.Popen(
-                    ["canberra-gtk-play", "-i", sound_id,
-                     f"--volume={self._volume_to_db(volume)}"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-                return
-
-            # Eigene Datei via paplay abspielen
+            # Datei via paplay abspielen
             subprocess.Popen(
                 ["paplay", f"--volume={int(volume * 65536)}", sound_file],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -527,8 +573,10 @@ class JtDictate:
         return f"{db:.0f}"
 
     def show_notification(self, title, message):
-        """Zeigt Notification."""
+        """Zeigt Notification (nur wenn in Settings aktiviert)."""
         try:
+            if not self.settings.get("notifications_enabled"):
+                return
             n = Notify.Notification.new(f"{APP_NAME}: {title}", message, "audio-input-microphone")
             n.show()
         except Exception:
@@ -561,8 +609,24 @@ class JtDictate:
         print(f"  jt-dictate --status")
         print("")
 
+        # Modell beim Start im Hintergrund vorladen
+        self._preload_model()
+
         self._mainloop = GLib.MainLoop()
         self._mainloop.run()
+
+    def _preload_model(self):
+        """Lädt das Whisper-Modell im Hintergrund vor, damit erste Aufnahme sofort starten kann."""
+        self.is_loading_model = True
+        def _load():
+            try:
+                self.transcriber.load_model()
+                print("Modell vorgeladen — bereit für Aufnahme.")
+            except Exception as e:
+                print(f"Modell-Vorladen fehlgeschlagen: {e}")
+            finally:
+                self.is_loading_model = False
+        threading.Thread(target=_load, daemon=True).start()
 
 
 def send_dbus_command(command):
